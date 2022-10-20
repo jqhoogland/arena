@@ -4,7 +4,7 @@ import numpy as np
 import torch
 from matplotlib import pyplot as plt
 from numpy import einsum
-from torch import nn
+from torch import nn, optim
 
 import utils
 
@@ -30,6 +30,8 @@ model = nn.Sequential(
     nn.Flatten(0, 1)
 )
 
+optimizer = optim.SGD(model.parameters(), lr=LEARNING_RATE)
+
 y_pred_list = []
 coeffs_list = []
 
@@ -49,11 +51,7 @@ for step in range(TOTAL_STEPS):
         coeffs_list.append([a_0, A_n.copy(), B_n.copy()])
 
     loss.backward()
-
-    with torch.no_grad():
-        for coeff in model.parameters():
-            coeff -= LEARNING_RATE * coeff.grad
-
+    optimizer.step()
     model.zero_grad()
 
 utils.visualise_fourier_coeff_convergence(x, y, y_pred_list, coeffs_list)
