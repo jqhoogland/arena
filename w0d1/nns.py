@@ -1,10 +1,10 @@
 #%%
 import ipywidgets as wg
 import numpy as np
-from numpy import einsum
 import torch
-
 from matplotlib import pyplot as plt
+from numpy import einsum
+from torch import nn
 
 import utils
 
@@ -23,32 +23,38 @@ y = TARGET_FUNC(x)
 
 x_cos = torch.stack([torch.cos(n * x) for n in range(1, NUM_FREQUENCIES + 1)])
 x_sin = torch.stack([torch.sin(n * x) for n in range(1, NUM_FREQUENCIES + 1)])
+x_all = torch.cat([x_cos, x_sin], dim=0).T
 
-a_0 = torch.randn((), device=device, dtype=dtype, requires_grad=True)
-A_n = torch.randn(NUM_FREQUENCIES, device=device, dtype=dtype, requires_grad=True)
-B_n = torch.randn(NUM_FREQUENCIES, device=device, dtype=dtype, requires_grad=True)
+model = nn.Sequential(
+    nn.Linear(2 * NUM_FREQUENCIES, 1, bias=True),
+    nn.Flatten(0, 1)
+)
 
 y_pred_list = []
 coeffs_list = []
 
 for step in range(TOTAL_STEPS):
 
-    y_pred = 0.5 * a_0 + A_n @ x_cos + B_n @ x_sin
+    y_pred = model(x_all)
     # y_pred = 0.5 * a_0 + einsum("freq x, freq -> x", x_cos, A_n) + einsum("freq x, freq -> x", x_sin, B_n)
 
     loss = torch.mean((y_pred - y).pow(2))
 
     if step % 100 == 0:
         print(f"{loss = :.2f}")
-        coeffs_list.append([a_0.detach().numpy().copy(), A_n.to("cpu").detach().numpy().copy(), B_n.to("cpu").detach().numpy().copy()])
-        y_pred_list.append(y_pred.detach())
+        A_n = list(model.parameters())[0].detach().numpy().squeeze()[:NUM_FREQUENCIES]
+        B_n = list(model.parameters())[0].detach().numpy().squeeze()[NUM_FREQUENCIES:]
+        a_0 = list(model.parameters())[1].item()
+        y_pred_list.append(y_pred.cpu().detach().numpy())
+        coeffs_list.append([a_0, A_n.copy(), B_n.copy()])
 
     loss.backward()
 
     with torch.no_grad():
-        for coeff in [a_0, A_n, B_n]:
+        for coeff in model.parameters():
             coeff -= LEARNING_RATE * coeff.grad
-            coeff.grad = None
+
+    model.zero_grad()
 
 utils.visualise_fourier_coeff_convergence(x, y, y_pred_list, coeffs_list)
 # %%
