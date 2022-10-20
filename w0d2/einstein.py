@@ -1,9 +1,11 @@
 #%%
 import einops
 import numpy as np
+from fancy_einsum import einsum
 from matplotlib import pyplot as plt
 
 import utils
+
 #%%
 
 ims = np.load('./numbers.npy', allow_pickle=False)
@@ -62,3 +64,41 @@ ims14 = einops.reduce(ims, "(b1 b2) c (h dh) (w dw) -> c (b1 h) (b2 w)", b1=2, d
 utils.display_array_as_img(ims14)
 # %%
 
+def einsum_trace(mat: np.ndarray):
+    """
+    Returns the same as `np.trace`.
+    """
+    return einsum("i i -> ", mat)
+
+def einsum_mv(mat: np.ndarray, vec: np.ndarray):
+    """
+    Returns the same as `np.matmul`, when `mat` is a 2D array and `vec` is 1D.
+    """
+    return einsum("i j, j -> i", mat, vec)
+
+def einsum_mm(mat1: np.ndarray, mat2: np.ndarray):
+    """
+    Returns the same as `np.matmul`, when `mat1` and `mat2` are both 2D arrays.
+    """
+    return einsum("i j, j k-> i k", mat1, mat2)
+
+def einsum_inner(vec1, vec2):
+    """
+    Returns the same as `np.inner`.
+    """
+    return einsum("i, i -> ", vec1, vec2)
+
+
+def einsum_outer(vec1, vec2):
+    """
+    Returns the same as `np.outer`.
+    """
+    return einsum("i, j -> i j", vec1, vec2)
+
+
+utils.test_einsum_trace(einsum_trace)
+utils.test_einsum_mv(einsum_mv)
+utils.test_einsum_mm(einsum_mm)
+utils.test_einsum_inner(einsum_inner)
+utils.test_einsum_outer(einsum_outer)
+# %%
