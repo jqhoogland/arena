@@ -33,3 +33,30 @@ utils.test_maxpool2d_module(MaxPool2d)
 m = MaxPool2d(kernel_size=3, stride=2, padding=1)
 print(f"Manually verify that this is an informative repr: {m}")
 # %%
+
+class ReLU(nn.Module):
+    def forward(self, x: t.Tensor) -> t.Tensor:
+        return (x > 0) * x
+
+utils.test_relu(ReLU)
+
+# %%
+
+class Flatten(nn.Module):
+    def __init__(self, start_dim: int = 1, end_dim: int = -1) -> None:
+        self.start_dim = start_dim
+        self.end_dim = end_dim 
+        super().__init__()
+
+    def forward(self, input: t.Tensor) -> t.Tensor:
+        '''Flatten out dimensions from start_dim to end_dim, inclusive of both.
+        '''
+        end = (len(input.shape) - 1 if self.end_dim == -1 else self.end_dim) + 1
+        new_shape = (*input.shape[:self.start_dim], -1, *input.shape[end:])
+        return input.reshape(new_shape)
+
+    def extra_repr(self) -> str:
+        return f"start_dim={self.start_dim}, end_dim={self.end_dim}"
+
+utils.test_flatten(Flatten)
+# %%
