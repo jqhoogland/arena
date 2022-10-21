@@ -83,3 +83,22 @@ def conv2d_minimal(x: t.Tensor, weights: t.Tensor) -> t.Tensor:
 
 utils.test_conv2d_minimal(conv2d_minimal)
 # %%
+
+def pad1d(x: t.Tensor, left: int, right: int, pad_value: float) -> t.Tensor:
+    '''Return a new tensor with padding applied to the edges.
+
+    x: shape (batch, in_channels, width), dtype float32
+
+    Return: shape (batch, in_channels, left + right + width)
+    '''
+    batch_size, n_in_channels, width = x.shape
+
+    x_padded = t.ones((batch_size, n_in_channels, width + left + right)) * pad_value
+    x_padded[..., left:-right] = x[:,:,:]
+    
+    return x_padded
+
+
+utils.test_pad1d(pad1d)
+utils.test_pad1d_multi_channel(pad1d)
+# %%
