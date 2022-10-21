@@ -120,3 +120,42 @@ def pad2d(x: t.Tensor, left: int, right: int, top: int, bottom: int, pad_value: 
 utils.test_pad2d(pad2d)
 utils.test_pad2d_multi_channel(pad2d)
 # %%
+
+def conv1d(x, weights, stride: int = 1, padding: int = 0) -> t.Tensor:
+    '''Like torch's conv1d using bias=False.
+
+    x: shape (batch, in_channels, width)
+    weights: shape (out_channels, in_channels, kernel_width)
+
+    Returns: shape (batch, out_channels, output_width)
+    '''
+
+    batch_size, n_in_channels, width = x.shape
+    
+    _, _n_in_channels, kernel_width = weights.shape
+    outer_width = ((width + 2 * padding - kernel_width) // stride) + 1
+
+    assert n_in_channels == _n_in_channels, \
+        f"The number of in channels must match between `x` and `weights`, received {n_in_channels} and {_n_in_channels}"
+  
+    x_padded = pad1d(x, padding, padding, 0.)
+    batch_stride, in_channels_stride, width_stride = x_padded.stride() # type: ignore
+
+    x_view = x_padded.as_strided(size=(
+            batch_size,
+            n_in_channels,
+            outer_width,
+            kernel_width
+        ), stride=(
+            batch_stride,
+            in_channels_stride, 
+            width_stride * stride,
+            width_stride
+        ))
+
+    return einsum("b c_in w_out w_kernel, c_out c_in w_kernel -> b c_out w_out", x_view, weights)
+
+
+utils.test_conv1d(conv1d)
+
+# %%
