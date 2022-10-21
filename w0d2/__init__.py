@@ -1,10 +1,12 @@
 #%%
 from collections import namedtuple
 
-import numpy as np
-import torch as t 
 import einops
+import numpy as np
+import torch as t
 from fancy_einsum import einsum
+
+import utils
 
 # %%
 
@@ -70,3 +72,52 @@ for (i, case) in enumerate(test_cases):
 
 # %%
 
+def as_strided_trace(mat: t.Tensor) -> t.Tensor:
+    '''
+    Returns the same as `torch.trace`, using only `as_strided` and `sum` methods.
+    '''
+
+    # I'm going to assume this wants only rank-2 matrices
+    n_cols = mat.shape[1]
+    return mat.as_strided(size=(n_cols, ), stride=(n_cols + 1, )).sum()
+
+utils.test_trace(as_strided_trace)
+
+# %%
+
+def as_strided_mv(mat: t.Tensor, vec: t.Tensor) -> t.Tensor:
+    '''
+    Returns the same as `torch.matmul`, using only `as_strided` and `sum` methods.
+    '''
+
+    n_rows, n_cols = mat.shape
+    v_stride = vec.stride()
+
+    return (
+        mat
+        * vec.as_strided(size=(n_rows, n_cols), stride=(0, v_stride[0]))
+    ).sum(1)
+
+utils.test_mv(as_strided_mv)
+utils.test_mv2(as_strided_mv)
+
+# %%
+
+def as_strided_mm(matA: t.Tensor, matB: t.Tensor) -> t.Tensor:
+    '''
+    Returns the same as `torch.matmul`, using only `as_strided` and `sum` methods.
+    '''
+    a_rows, a_cols = matA.shape
+    a_stride = matA.stride() # type: ignore
+
+    _, b_cols = matB.shape  # Assumes shapes are already checked
+    b_stride = matB.stride()
+
+    return (
+        matA.as_strided(size=(a_rows, a_cols, b_cols), stride=(a_stride[0], a_stride[1], 0)) # type: ignore
+        * matB.as_strided(size=(a_rows, a_cols, b_cols), stride=(0, b_stride[0], b_stride[1])) # type: ignore
+    ).sum(1)
+
+utils.test_mm(as_strided_mm)
+utils.test_mm2(as_strided_mm)
+# %%
