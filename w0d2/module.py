@@ -5,7 +5,7 @@ import torch.nn as nn
 from fancy_einsum import einsum
 
 import utils
-from convolutions import force_pair, maxpool2d
+from convolutions import conv2d, force_pair, maxpool2d
 
 # %%
 
@@ -78,8 +78,8 @@ class Linear(nn.Module):
         '''
         super().__init__()
 
-        self.weight = nn.parameter.Parameter((uniform_random((out_features, in_features), np.sqrt(in_features))))
-        self.bias = nn.parameter.Parameter((uniform_random((out_features, ), np.sqrt(in_features)))) \
+        self.weight = nn.parameter.Parameter((uniform_random((out_features, in_features), 1. / np.sqrt(in_features))))
+        self.bias = nn.parameter.Parameter((uniform_random((out_features, ), 1. /np.sqrt(in_features)))) \
             if bias else None
 
 
@@ -99,5 +99,36 @@ class Linear(nn.Module):
 utils.test_linear_forward(Linear)
 utils.test_linear_parameters(Linear)
 utils.test_linear_no_bias(Linear)
+
+# %%
+class Conv2d(nn.Module):
+    def __init__(
+        self, in_channels: int, out_channels: int, kernel_size: IntOrPair, stride: IntOrPair = 1, padding: IntOrPair = 0
+    ):
+        '''
+        Same as torch.nn.Conv2d with bias=False.
+
+        Name your weight field `self.weight` for compatibility with the PyTorch version.
+        '''
+        self.in_channels = in_channels
+        self.out_channels = out_channels
+        self.kernel_size = self.kernel_width, self.kernel_height = force_pair(kernel_size)
+        self.stride = stride
+        self.padding = padding        
+
+        super().__init__()
+
+        n_in = in_channels * self.kernel_width * self.kernel_height
+        self.weight = nn.parameter.Parameter(uniform_random((out_channels, in_channels, self.kernel_height, self.kernel_width), 1. / np.sqrt(n_in)))
+        
+    def forward(self, x: t.Tensor) -> t.Tensor:
+        '''Apply the functional conv2d you wrote earlier.'''
+        return conv2d(x, self.weight, self.stride, self.padding)
+
+    def extra_repr(self) -> str:
+        return ", ".join(map(lambda p: f"{p}={getattr(self, p)}", ("in_channels", "out_channels", "kernel_size", "stride", "padding")))
+
+
+utils.test_conv2d_module(Conv2d)
 
 # %%
