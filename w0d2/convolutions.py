@@ -84,7 +84,7 @@ def conv2d_minimal(x: t.Tensor, weights: t.Tensor) -> t.Tensor:
 utils.test_conv2d_minimal(conv2d_minimal)
 # %%
 
-def pad1d(x: t.Tensor, left: int, right: int, pad_value: float) -> t.Tensor:
+def pad1d(x: t.Tensor, left: int, right: int, pad_value=0.) -> t.Tensor:
     '''Return a new tensor with padding applied to the edges.
 
     x: shape (batch, in_channels, width), dtype float32
@@ -103,7 +103,7 @@ utils.test_pad1d(pad1d)
 utils.test_pad1d_multi_channel(pad1d)
 # %%
 
-def pad2d(x: t.Tensor, left: int, right: int, top: int, bottom: int, pad_value: float) -> t.Tensor:
+def pad2d(x: t.Tensor, left: int, right: int, top: int, bottom: int, pad_value=0.) -> t.Tensor:
     '''Return a new tensor with padding applied to the edges.
 
     x: shape (batch, in_channels, height, width), dtype float32
@@ -195,7 +195,7 @@ def conv2d(x, weights, stride: IntOrPair = 1, padding: IntOrPair = 0) -> t.Tenso
     assert n_in_channels == _n_in_channels, \
         f"The number of in channels must match between `x` and `weights`, received {n_in_channels} and {_n_in_channels}"
   
-    x_padded = pad2d(x, padding_x, padding_x, padding_y, padding_y, 0.)
+    x_padded = pad2d(x, padding_x, padding_x, padding_y, padding_y)
     batch_stride, in_channels_stride, height_stride, width_stride = x_padded.stride() # type: ignore
     
     x_view = x_padded.as_strided(size=(
@@ -218,5 +218,43 @@ def conv2d(x, weights, stride: IntOrPair = 1, padding: IntOrPair = 0) -> t.Tenso
 
 
 utils.test_conv2d(conv2d)
+
+# %%
+
+def maxpool2d(x: t.Tensor, kernel_size: IntOrPair, stride: IntOrPair | None = None, padding: IntOrPair = 0
+) -> t.Tensor:
+    '''Like PyTorch's maxpool2d.
+
+    x: shape (batch, channels, height, width)
+    stride: if None, should be equal to the kernel size
+
+    Return: (batch, channels, out_height, output_width)
+    '''
+    kernel_height, kernel_width = force_pair(kernel_size)
+    stride_y, stride_x = force_pair(stride) if stride is not None else (kernel_height, kernel_width)
+    padding_y, padding_x = force_pair(padding)
+
+    batch_size, n_channels, height, width = x.shape
+    out_height = (height + 2 * padding_y - kernel_height) // stride_y + 1
+    out_width = (width + 2 * padding_x - kernel_width) // stride_x + 1
+
+    x_padded = pad2d(x, padding_x, padding_x, padding_y, padding_y, x.min())
+    batch_stride, channels_stride, height_stride, width_stride = x_padded.stride() #type: ignore
+
+    x_view = x_padded.as_strided(
+        size=(batch_size, n_channels, out_height, out_width, kernel_height, kernel_width),
+        stride=(
+            batch_stride, 
+            channels_stride,
+            height_stride * stride_y,
+            width_stride * stride_x,
+            height_stride,
+            width_stride
+        )
+    )
+
+    return x_view.amax((-2, -1))
+
+utils.test_maxpool2d(maxpool2d)
 
 # %%
