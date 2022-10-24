@@ -4,8 +4,8 @@ import torch as t
 import torch.nn as nn
 from fancy_einsum import einsum
 
-import utils
-from convolutions import conv2d, force_pair, maxpool2d
+from arena.w0d2 import utils
+from arena.w0d2.convolutions import conv2d, force_pair, maxpool2d
 
 # %%
 

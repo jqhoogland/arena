@@ -4,7 +4,7 @@ import numpy as np
 import torch as t
 from fancy_einsum import einsum
 
-import utils
+from arena.w0d2 import utils
 
 # %%
 
