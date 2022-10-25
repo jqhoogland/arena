@@ -2,6 +2,7 @@
 import json
 from pathlib import Path
 from typing import Callable, Optional, Tuple, Union
+from pprint import pp
 
 import PIL
 import plotly.express as px
@@ -15,6 +16,8 @@ from torch import nn
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 from tqdm import tqdm
+
+from torchvision import models
 
 # %%
 
@@ -45,7 +48,6 @@ class BatchNorm2d(nn.Module):
         self.eps = eps
         self.num_features = num_features
 
-        self.num_batches_tracked = t.tensor(0, dtype=t.float)
 
         super().__init__()
 
@@ -54,6 +56,7 @@ class BatchNorm2d(nn.Module):
 
         self.register_buffer("running_mean", t.zeros(num_features))
         self.register_buffer("running_var", t.ones(num_features))
+        self.register_buffer("num_batches_tracked", t.tensor(0, dtype=t.float))
 
     def forward(self, x: t.Tensor) -> t.Tensor:
         '''Normalize each channel.
@@ -115,16 +118,16 @@ class ResidualBlock(nn.Module):
         super().__init__()
 
         self.left = Sequential(
-            nn.Conv2d(in_feats, out_feats, kernel_size=3, stride=first_stride, padding=0),
+            nn.Conv2d(in_feats, out_feats, kernel_size=3, stride=first_stride, padding=0, bias=False),
             BatchNorm2d(out_feats),
             nn.ReLU(),
-            nn.Conv2d(out_feats, out_feats, kernel_size=3, stride=1, padding=0),
+            nn.Conv2d(out_feats, out_feats, kernel_size=3, stride=1, padding=0, bias=False),
             BatchNorm2d(out_feats)
         )
 
         if first_stride > 1:
             self.right = nn.Sequential(
-                nn.Conv2d(in_feats, out_feats, kernel_size=1, stride=first_stride),
+                nn.Conv2d(in_feats, out_feats, kernel_size=1, stride=first_stride, bias=False),
                 BatchNorm2d(out_feats)
             )
         else:
@@ -190,10 +193,12 @@ class ResNet34(nn.Module):
 
         super().__init__()
 
-        self.conv = nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3)
+        self.conv = nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3, bias=False)
         self.bn = BatchNorm2d(64)
         self.relu = nn.ReLU()
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
+        
+        out_features_per_group = [out_features_per_group[0], *out_features_per_group]
         self.block_groups = nn.ModuleList([
             BlockGroup(n_blocks_per_group[i], out_features_per_group[i], out_features_per_group[i + 1], first_strides_per_group[i])
             for i in range(len(n_blocks_per_group))
@@ -221,4 +226,19 @@ class ResNet34(nn.Module):
         x = self.fc(x)
 
         return x
+# %%
+
+my_resnet = ResNet34()
+resnet34 = models.resnet34(weights=models.ResNet34_Weights.IMAGENET1K_V1, progress=False)
+
+# %%
+
+my_resnet_state = list(my_resnet.state_dict().items())
+resnet_state = list(resnet34.state_dict().items())
+
+for i in range(min(len(my_resnet_state), len(resnet_state))):
+    print(my_resnet_state[i][0], my_resnet_state[i][1].shape)
+    print(resnet_state[i][0], resnet_state[i][1].shape)
+    print("\n")
+
 # %%
