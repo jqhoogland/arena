@@ -98,3 +98,127 @@ class AveragePool(nn.Module):
 
 
 # %%
+
+
+class ResidualBlock(nn.Module):
+    def __init__(self, in_feats: int, out_feats: int, first_stride=1):
+        '''A single residual block with optional downsampling.
+
+        For compatibility with the pretrained model, declare the left side branch first using a `Sequential`.
+
+        If first_stride is > 1, this means the optional (conv + bn) should be present on the right branch. Declare it second using another `Sequential`.
+        '''
+        self.in_feats = in_feats
+        self.out_feats = out_feats
+        self.first_stride = first_stride
+
+        super().__init__()
+
+        self.left = Sequential(
+            nn.Conv2d(in_feats, out_feats, kernel_size=3, stride=first_stride, padding=0),
+            BatchNorm2d(out_feats),
+            nn.ReLU(),
+            nn.Conv2d(out_feats, out_feats, kernel_size=3, stride=1, padding=0),
+            BatchNorm2d(out_feats)
+        )
+
+        if first_stride > 1:
+            self.right = nn.Sequential(
+                nn.Conv2d(in_feats, out_feats, kernel_size=1, stride=first_stride),
+                BatchNorm2d(out_feats)
+            )
+        else:
+            self.right = nn.Identity()
+
+        self.relu = nn.ReLU()
+
+    def forward(self, x: t.Tensor) -> t.Tensor:
+        '''Compute the forward pass.
+
+        x: shape (batch, in_feats, height, width)
+
+        Return: shape (batch, out_feats, height / first_stride, width / first_stride)
+        '''
+        x = self.left(x) + self.right(x)
+        x = self.relu(x)
+
+        return x
+
+#%%
+
+class BlockGroup(nn.Module):
+    def __init__(self, n_blocks: int, in_feats: int, out_feats: int, first_stride=1):
+        '''An n_blocks-long sequence of ResidualBlock where only the first block uses the provided stride.'''
+        self.n_blocks = n_blocks
+        self.in_feats = in_feats
+        self.out_feats = out_feats
+        self.first_stride = first_stride
+
+        super().__init__()
+
+        self.blocks = nn.ModuleList([
+            ResidualBlock(in_feats, out_feats, first_stride) if i == 0 else ResidualBlock(out_feats, out_feats)
+            for i in range(n_blocks)
+        ])
+
+    def forward(self, x: t.Tensor) -> t.Tensor:
+        '''Compute the forward pass.
+        x: shape (batch, in_feats, height, width)
+
+        Return: shape (batch, out_feats, height / first_stride, width / first_stride)
+        '''
+        for block in self.blocks:
+            x = block(x)
+
+        return x
+
+
+# %%
+
+class ResNet34(nn.Module):
+    def __init__(
+        self,
+        n_blocks_per_group=[3, 4, 6, 3],
+        out_features_per_group=[64, 128, 256, 512],
+        first_strides_per_group=[1, 2, 2, 2],
+        n_classes=1000,
+    ):
+        self.n_blocks_per_group = n_blocks_per_group
+        self.out_features_per_group = out_features_per_group
+        self.first_strides_per_group = first_strides_per_group
+        self.n_classes = n_classes
+
+        super().__init__()
+
+        self.conv = nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3)
+        self.bn = BatchNorm2d(64)
+        self.relu = nn.ReLU()
+        self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
+        self.block_groups = nn.ModuleList([
+            BlockGroup(n_blocks_per_group[i], out_features_per_group[i], out_features_per_group[i + 1], first_strides_per_group[i])
+            for i in range(len(n_blocks_per_group))
+        ])
+        self.avgpool = AveragePool()
+        self.flatten = nn.Flatten()
+        self.fc = nn.Linear(out_features_per_group[-1], n_classes)
+
+    def forward(self, x: t.Tensor) -> t.Tensor:
+        '''
+        x: shape (batch, channels, height, width)
+
+        Return: shape (batch, n_classes)
+        '''
+        x = self.conv(x)
+        x = self.bn(x)
+        x = self.relu(x)
+        x = self.maxpool(x)
+
+        for block_group in self.block_groups:
+            x = block_group(x)
+        
+        x = self.avgpool(x)
+        x = self.flatten(x)
+        x = self.fc(x)
+
+        return x
+# %%
