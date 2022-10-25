@@ -118,10 +118,10 @@ class ResidualBlock(nn.Module):
         super().__init__()
 
         self.left = Sequential(
-            nn.Conv2d(in_feats, out_feats, kernel_size=3, stride=first_stride, padding=0, bias=False),
+            nn.Conv2d(in_feats, out_feats, kernel_size=3, stride=first_stride, padding=1, bias=False),
             BatchNorm2d(out_feats),
             nn.ReLU(),
-            nn.Conv2d(out_feats, out_feats, kernel_size=3, stride=1, padding=0, bias=False),
+            nn.Conv2d(out_feats, out_feats, kernel_size=3, stride=1, padding=1, bias=False),
             BatchNorm2d(out_feats)
         )
 
@@ -146,6 +146,8 @@ class ResidualBlock(nn.Module):
         x = self.relu(x)
 
         return x
+
+print(pretrained_resnet)
 
 #%%
 
@@ -229,16 +231,100 @@ class ResNet34(nn.Module):
 # %%
 
 my_resnet = ResNet34()
-resnet34 = models.resnet34(weights=models.ResNet34_Weights.IMAGENET1K_V1, progress=False)
+pretrained_resnet = models.resnet34(weights=models.ResNet34_Weights.IMAGENET1K_V1, progress=False)
 
 # %%
 
 my_resnet_state = list(my_resnet.state_dict().items())
-resnet_state = list(resnet34.state_dict().items())
+pretrained_resnet_state = list(pretrained_resnet.state_dict().items())
 
-for i in range(min(len(my_resnet_state), len(resnet_state))):
-    print(my_resnet_state[i][0], my_resnet_state[i][1].shape)
-    print(resnet_state[i][0], resnet_state[i][1].shape)
+for i in range(min(len(my_resnet_state), len(pretrained_resnet_state))):
+
+    if my_resnet_state[i][1].shape != pretrained_resnet_state[i][1].shape:
+        print("ERROR:")
+        print(my_resnet_state[i][0], my_resnet_state[i][1].shape)
+        print(pretrained_resnet_state[i][0], pretrained_resnet_state[i][1].shape)
+
+    else:
+        print(my_resnet_state[i][0], pretrained_resnet_state[i][0], my_resnet_state[i][1].shape)
+
     print("\n")
 
 # %%
+
+def copy_weights(myresnet: ResNet34, pretrained_resnet: torchvision.models.resnet.ResNet) -> ResNet34:
+    '''Copy over the weights of `pretrained_resnet` to your resnet.'''
+
+    mydict = myresnet.state_dict()
+    pretraineddict = pretrained_resnet.state_dict()
+
+    # Check the number of params/buffers is correct
+    assert len(mydict) == len(pretraineddict), "Number of layers is wrong. Have you done the prev step correctly?"
+
+    # Initialise an empty dictionary to store the correct key-value pairs
+    state_dict_to_load = {}
+
+    for (mykey, myvalue), (pretrainedkey, pretrainedvalue) in zip(mydict.items(), pretraineddict.items()):
+        state_dict_to_load[mykey] = pretrainedvalue
+
+    myresnet.load_state_dict(state_dict_to_load)
+
+    return myresnet
+
+my_resnet = copy_weights(my_resnet, pretrained_resnet)
+# %%
+
+IMAGE_FILENAMES = [
+    "chimpanzee.jpg",
+    "golden_retriever.jpg",
+    "platypus.jpg",
+    "frogs.jpg",
+    "fireworks.jpg",
+    "astronaut.jpg",
+    "iguana.jpg",
+    "volcano.jpg",
+    "goofy.jpg",
+    "dragonfly.jpg",
+]
+
+IMAGE_FOLDER = Path("../w0d3/resnet_inputs")
+
+images = [Image.open(IMAGE_FOLDER / filename) for filename in IMAGE_FILENAMES]
+images[0]
+# %%
+transform = transforms.Compose([
+    transforms.ToTensor(),
+    transforms.Resize((224, 224)),
+    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+])
+# %%
+
+def prepare_data(images: list[Image.Image]) -> t.Tensor:
+    '''
+    Return: shape (batch=len(images), num_channels=3, height=224, width=224)
+    '''
+    return t.stack([transform(image) for image in images])
+    
+
+prepared_images = prepare_data(images)
+# %%
+
+def predict(model, images):
+    logits = model(images)
+    return logits.argmax(dim=1)
+
+# %%
+IMAGENET_CLASSES = []
+
+with open("../w0d3/imagenet_labels.json") as f:
+    IMAGENET_CLASSES = list(json.load(f).values())
+
+def predict_label(model, images):
+    labels = predict(model, images)
+    return [IMAGENET_CLASSES[label] for label in labels]
+
+# %%
+
+predict_label(my_resnet, prepared_images)
+# %%
+
