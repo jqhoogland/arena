@@ -11,7 +11,7 @@ def attention(
     Q: TensorType["batch", "seq_len", "d_head"],
     K: TensorType["batch", "seq_len", "d_head"],
     V: TensorType["batch", "seq_len", "d_head"],
-) -> TensorType["batch", "seq_len"]:
+) -> TensorType["batch", "seq_len", "d_head"]:
     '''
     Should return the results of self-attention.
 
@@ -80,7 +80,7 @@ test_mask()
 def masked_attention(
     Q: TensorType["batch", "seq_len", "d_head"],
     K: TensorType["batch", "seq_len", "d_head"],
-    V: TensorType["batch", "seq_len", "seq_len"],
+    V: TensorType["batch", "seq_len", "d_head"],
 
 ) -> TensorType["batch", "seq_len", "d_head"]:
     '''
