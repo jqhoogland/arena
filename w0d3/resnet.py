@@ -19,6 +19,8 @@ from tqdm import tqdm
 
 from torchvision import models
 
+from arena.w0d2.module import MaxPool2d, Conv2d, Flatten, Linear, ReLU
+
 # %%
 
 class Sequential(nn.Module):
@@ -118,22 +120,22 @@ class ResidualBlock(nn.Module):
         super().__init__()
 
         self.left = Sequential(
-            nn.Conv2d(in_feats, out_feats, kernel_size=3, stride=first_stride, padding=1, bias=False),
+            Conv2d(in_feats, out_feats, kernel_size=3, stride=first_stride, padding=1, bias=False),
             BatchNorm2d(out_feats),
-            nn.ReLU(),
-            nn.Conv2d(out_feats, out_feats, kernel_size=3, stride=1, padding=1, bias=False),
+            ReLU(),
+            Conv2d(out_feats, out_feats, kernel_size=3, stride=1, padding=1, bias=False),
             BatchNorm2d(out_feats)
         )
 
         if first_stride > 1:
-            self.right = nn.Sequential(
-                nn.Conv2d(in_feats, out_feats, kernel_size=1, stride=first_stride, bias=False),
+            self.right = Sequential(
+                Conv2d(in_feats, out_feats, kernel_size=1, stride=first_stride, bias=False),
                 BatchNorm2d(out_feats)
             )
         else:
-            self.right = nn.Identity()
+            self.right = Identity()
 
-        self.relu = nn.ReLU()
+        self.relu = ReLU()
 
     def forward(self, x: t.Tensor) -> t.Tensor:
         '''Compute the forward pass.
@@ -197,8 +199,8 @@ class ResNet34(nn.Module):
 
         self.conv = nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3, bias=False)
         self.bn = BatchNorm2d(64)
-        self.relu = nn.ReLU()
-        self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
+        self.relu = ReLU()
+        self.maxpool = MaxPool2d(kernel_size=3, stride=2, padding=1)
         
         out_features_per_group = [out_features_per_group[0], *out_features_per_group]
         self.block_groups = nn.ModuleList([
@@ -206,8 +208,8 @@ class ResNet34(nn.Module):
             for i in range(len(n_blocks_per_group))
         ])
         self.avgpool = AveragePool()
-        self.flatten = nn.Flatten()
-        self.fc = nn.Linear(out_features_per_group[-1], n_classes)
+        self.flatten = Flatten()
+        self.fc = Linear(out_features_per_group[-1], n_classes)
 
     def forward(self, x: t.Tensor) -> t.Tensor:
         '''

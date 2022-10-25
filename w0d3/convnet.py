@@ -18,7 +18,7 @@ from tqdm import tqdm
 
 # %%
 
-class ConvNet(nn.Module):
+class AlexNet(nn.Module):
     def __init__(self):
         super().__init__()
 
@@ -54,7 +54,7 @@ class ConvNet(nn.Module):
 
 # %%
 
-model = ConvNet()
+model = AlexNet()
 # %%
 
 transform = transforms.Compose([
@@ -78,15 +78,15 @@ epochs = 3
 loss_fn = nn.CrossEntropyLoss()
 batch_size = 128
 
-MODEL_FILENAME = "./w1d2_convnet_mnist.pt"
+MODEL_FILENAME = "./w1d2_AlexNet_mnist.pt"
 device = "cuda" if t.cuda.is_available() else "cpu"
 
-def train_convnet(trainloader: DataLoader, epochs: int, loss_fn: Callable) -> list:
+def train_AlexNet(trainloader: DataLoader, epochs: int, loss_fn: Callable) -> list:
     '''
-    Defines a ConvNet using our previous code, and trains it on the data in trainloader.
+    Defines a AlexNet using our previous code, and trains it on the data in trainloader.
     '''
 
-    model = ConvNet().to(device).train()
+    model = AlexNet().to(device).train()
     optimizer = t.optim.Adam(model.parameters())
     loss_list = []
     accuracy_list = []
@@ -127,7 +127,7 @@ def train_convnet(trainloader: DataLoader, epochs: int, loss_fn: Callable) -> li
 
 # %%
 
-loss_list, accuracy_list = train_convnet(trainloader, epochs, loss_fn)
+loss_list, accuracy_list = train_AlexNet(trainloader, epochs, loss_fn)
 
 # %%
 
