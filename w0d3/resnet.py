@@ -133,7 +133,7 @@ class ResidualBlock(nn.Module):
                 BatchNorm2d(out_feats)
             )
         else:
-            self.right = Identity()
+            self.right = nn.Identity()
 
         self.relu = ReLU()
 
@@ -195,7 +195,7 @@ class ResNet34(nn.Module):
 
         super().__init__()
 
-        self.conv = nConv2d(3, 64, kernel_size=7, stride=2, padding=3, bias=False)
+        self.conv = Conv2d(3, 64, kernel_size=7, stride=2, padding=3, bias=False)
         self.bn = BatchNorm2d(64)
         self.relu = ReLU()
         self.maxpool = MaxPool2d(kernel_size=3, stride=2, padding=1)
