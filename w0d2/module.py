@@ -104,7 +104,7 @@ utils.test_linear_no_bias(Linear)
 class Conv2d(nn.Module):
     def __init__(
         self, in_channels: int, out_channels: int, kernel_size: IntOrPair, stride: IntOrPair = 1, padding: IntOrPair = 0,
-        bias = true
+        bias = True
     ):
         '''
         Same as torch.nn.Conv2d with bias=False.
