@@ -87,3 +87,14 @@ utils.test_batchnorm2d_module(BatchNorm2d)
 utils.test_batchnorm2d_forward(BatchNorm2d)
 utils.test_batchnorm2d_running_mean(BatchNorm2d)
 # %%
+
+class AveragePool(nn.Module):
+    def forward(self, x: t.Tensor) -> t.Tensor:
+        '''
+        x: shape (batch, channels, height, width)
+        Return: shape (batch, channels)
+        '''
+        return x.mean(dim=(2, 3))
+
+
+# %%
