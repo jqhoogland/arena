@@ -44,7 +44,7 @@ transformer = DecoderOnlyTransformer(config)
 
 loss = t.tensor(0.)
 loss_fn = nn.CrossEntropyLoss()
-optimizer = t.optim.Adam(transformer.parameters(), lr=1e-2)
+optimizer = t.optim.Adam(transformer.parameters(), lr=1e-3)
 
 for epoch in range(20):
     for batch in train_dataloader:
