@@ -102,7 +102,7 @@ def masked_attention(
         einsum("b s h, b t h-> b s t", Q, K)
     ) / np.sqrt(d_head)
 
-    A: TensorType["seq_len", "seq_len"] = t.softmax(A_pre, dim=1)
+    A: TensorType["batch", "seq_len", "seq_len"] = t.softmax(A_pre, dim=1)
 
     return A @ V
 
@@ -135,7 +135,7 @@ def multihead_masked_attention(
         einsum("b h s c, b h t c -> b h s t", _Q, _K)
     ) / np.sqrt(d_head)
 
-    A: TensorType["seq_len", "seq_len"] = t.softmax(A_pre, dim=1)
+    A: TensorType["batch", "seq_len", "seq_len"] = t.softmax(A_pre, dim=1)
 
     return einops.rearrange(A @ _V, "batch n_heads seq headsize -> batch seq (n_heads headsize)") 
 
