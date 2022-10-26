@@ -412,3 +412,38 @@ else:
     assert False, "Passing tensor by keyword should raise some informative exception."
 
 # %%
+
+class Node:
+    def __init__(self, *children):
+        self.children = list(children)
+
+def get_children(node: Node) -> list[Node]:
+    return node.children
+
+def topological_sort(node: Node, get_children_fn: Callable) -> list[Any]:
+    '''
+    Return a list of node's descendants in reverse topological order from future to past.
+
+    Should raise an error if the graph with `node` as root is not in fact acyclic.
+    '''
+    
+    def dfs(node: Node, visited: set[Node], stack: list[Node], path: set[Node] = set()):
+        visited.add(node)
+
+        for child in get_children_fn(node):
+            if child not in visited:
+                dfs(child, visited, stack, path | {node})
+            if child in path:
+                raise ValueError("Graph is not acyclic")
+        stack.append(node)
+    
+    visited = set()
+    stack = []
+    dfs(node, visited, stack)
+    return stack
+
+utils.test_topological_sort_linked_list(topological_sort)
+utils.test_topological_sort_branching(topological_sort)
+utils.test_topological_sort_rejoining(topological_sort)
+utils.test_topological_sort_cyclic(topological_sort)
+# %%
