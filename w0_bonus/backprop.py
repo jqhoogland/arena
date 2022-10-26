@@ -1177,3 +1177,12 @@ def cross_entropy(logits: Tensor, true_labels: Tensor) -> Tensor:
 utils.test_cross_entropy(Tensor, cross_entropy)
 
 # %%
+
+# TODO: Warnings for in-place
+# TODO: In-place ReLU
+# TODO: Backward for einsum
+# TODO: ADD support for all Resnet details
+# TODO: Central difference checking
+# TODO: Non-differentiable fn support (all, any, floor, less, etc.)
+# TODO: Differentiable wrt keyword args
+# TODO: stack
