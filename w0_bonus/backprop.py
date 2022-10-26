@@ -461,7 +461,7 @@ def sorted_computational_graph(node: Tensor) -> list[Tensor]:
     '''
     For a given tensor, return a list of Tensors that make up the nodes of the given Tensor's computational graph, in reverse topological order.
     '''
-    return topological_sort(node, get_parents)
+    return topological_sort(node, get_parents)[::-1]
 
 a = Tensor([1], requires_grad=True)
 b = Tensor([2], requires_grad=True)
@@ -530,4 +530,472 @@ def backprop(end_node: Tensor, end_grad: Optional[Tensor] = None) -> None:
                 grads[parent] = in_grad
             else:
                 grads[parent] += in_grad
+# %%
+
+def _argmax(x: Arr, dim=None, keepdim=False):
+    '''Like torch.argmax.'''
+    return np.expand_dims(np.argmax(x, axis=dim), axis=([] if dim is None else dim))
+
+argmax = wrap_forward_fn(_argmax, is_differentiable=False)
+eq = wrap_forward_fn(np.equal, is_differentiable=False)
+
+a = Tensor([1.0, 0.0, 3.0, 4.0], requires_grad=True)
+b = a.argmax()
+assert not b.requires_grad
+assert b.recipe is None
+assert b.item() == 3
+
+# %%
+
+def negative_back(grad_out: Arr, out: Arr, x: Arr) -> Arr:
+    '''Backward function for f(x) = -x elementwise.'''
+    return np.full_like(x, -1) * grad_out 
+    
+negative = wrap_forward_fn(np.negative)
+BACK_FUNCS.add_back_func(np.negative, 0, negative_back)
+
+utils.test_negative_back(Tensor)
+# %%
+
+def exp_back(grad_out: Arr, out: Arr, x: Arr) -> Arr:
+    return out * grad_out
+
+exp = wrap_forward_fn(np.exp)
+BACK_FUNCS.add_back_func(np.exp, 0, exp_back)
+
+utils.test_exp_back(Tensor)
+
+# %%
+
+def reshape_back(grad_out: Arr, out: Arr, x: Arr, new_shape: tuple) -> Arr:
+    return grad_out.reshape(x.shape)
+
+reshape = wrap_forward_fn(np.reshape)
+BACK_FUNCS.add_back_func(np.reshape, 0, reshape_back)
+
+utils.test_reshape_back(Tensor)
+
+# %%
+
+def permute_back(grad_out: Arr, out: Arr, x: Arr, axes: tuple) -> Arr:
+    return np.transpose(grad_out, tuple(np.argsort(axes)))
+
+BACK_FUNCS.add_back_func(np.transpose, 0, permute_back)
+permute = wrap_forward_fn(np.transpose)
+
+utils.test_permute_back(Tensor)
+# %%
+
+def expand_back(grad_out: Arr, out: Arr, x: Arr, new_shape: tuple) -> Arr:
+    return unbroadcast(grad_out, x)
+
+def _expand(x: Arr, new_shape) -> Arr:
+    '''Like torch.expand, calling np.broadcast_to internally.
+
+    Note torch.expand supports -1 for a dimension size meaning "don't change the size".
+    np.broadcast_to does not natively support this.
+    '''
+    n_added = len(new_shape) - x.ndim
+    shape_non_negative = tuple([x.shape[i - n_added] if s == -1 else s for i, s in enumerate(new_shape)])
+
+    return np.broadcast_to(x, shape_non_negative)
+
+expand = wrap_forward_fn(_expand)
+BACK_FUNCS.add_back_func(_expand, 0, expand_back)
+
+utils.test_expand(Tensor)
+utils.test_expand_negative_length(Tensor)
+# %%
+
+def sum_back(grad_out: Arr | Tensor, out: Arr, x: Arr, dim=None, keepdim=False):
+    '''Basic idea: repeat grad_out over the dims along which x was summed'''
+    
+    # If grad_out is a scalar, we need to make it a tensor (so we can expand it later)
+    if not isinstance(grad_out, Arr):
+        grad_out = Tensor(grad_out)
+    
+    # If dim=None, this means we summed over all axes, and we want to repeat back to input shape
+    if dim is None:
+        dim = list(range(x.ndim))
+        
+    # If keepdim=False, then we need to add back in dims, so grad_out and x have same number of dims
+    if keepdim == False:
+        grad_out = np.expand_dims(grad_out, dim)
+    
+    # Finally, we repeat grad_out along the dims over which x was summed
+    return np.broadcast_to(grad_out, x.shape)
+
+def _sum(x: Arr, dim=None, keepdim=False) -> Arr:
+    '''Like torch.sum, calling np.sum internally.'''
+    return np.sum(x, axis=dim, keepdims=keepdim)
+
+sum = wrap_forward_fn(_sum)
+BACK_FUNCS.add_back_func(_sum, 0, sum_back)
+
+utils.test_sum_keepdim_false(Tensor)
+utils.test_sum_keepdim_true(Tensor)
+utils.test_sum_dim_none(Tensor)
+# %%
+
+Index = Union[int, tuple[int, ...], tuple[Arr], tuple[Tensor]]
+
+def coerce_index(index: Index) -> Union[int, tuple[int, ...], tuple[Arr]]:
+    """
+    If index is of type signature `tuple[Tensor]`, converts it to `tuple[Arr]`.
+    """
+    if isinstance(index, tuple) and set(map(type, index)) == {Tensor}:
+        return tuple([i.array for i in index])
+    else:
+        return index
+
+def _getitem(x: Arr, index: Index) -> Arr:
+    '''Like x[index] when x is a torch.Tensor.'''
+    return x[coerce_index(index)]
+
+def getitem_back(grad_out: Arr, out: Arr, x: Arr, index: Index):
+    '''Backwards function for _getitem.
+
+    Hint: use np.add.at(a, indices, b)
+    This function works just like a[indices] += b, except that it allows for repeated indices.
+    '''
+    new_grad_out = np.full_like(x, 0)
+    np.add.at(new_grad_out, coerce_index(index), grad_out)
+    return new_grad_out
+
+getitem = wrap_forward_fn(_getitem)
+BACK_FUNCS.add_back_func(_getitem, 0, getitem_back)
+
+utils.test_getitem_int(Tensor)
+utils.test_getitem_tuple(Tensor)
+utils.test_getitem_integer_array(Tensor)
+utils.test_getitem_integer_tensor(Tensor)
+
+# %%
+
+add = wrap_forward_fn(np.add)
+subtract = wrap_forward_fn(np.subtract)
+true_divide = wrap_forward_fn(np.true_divide)
+
+# Your code goes here
+BACK_FUNCS.add_back_func(np.add, 0, lambda grad_out, out, x, y: unbroadcast(grad_out, x))
+BACK_FUNCS.add_back_func(np.add, 1, lambda grad_out, out, x, y:  unbroadcast(grad_out, y))
+BACK_FUNCS.add_back_func(np.subtract, 0, lambda grad_out, out, x, y:  unbroadcast(grad_out, x))
+BACK_FUNCS.add_back_func(np.subtract, 1, lambda grad_out, out, x, y: unbroadcast(-grad_out, y))
+BACK_FUNCS.add_back_func(np.true_divide, 0, lambda grad_out, out, x, y: unbroadcast(grad_out/y, x))
+BACK_FUNCS.add_back_func(np.true_divide, 1, lambda grad_out, out, x, y: unbroadcast(grad_out * (-x / (y ** 2)), y))
+
+utils.test_add_broadcasted(Tensor)
+utils.test_subtract_broadcasted(Tensor)
+utils.test_truedivide_broadcasted(Tensor)
+# %%
+
+
+🏠
+Home
+1️⃣
+Introduction
+2️⃣
+Autograd
+3️⃣
+More forward and backward methods
+4️⃣
+Putting everything together
+5️⃣
+Bonus
+Table of Contents
+Non-Differentiable Functions
+Implementing negative
+Implementing exp
+Implementing reshape
+permute
+expand
+sum
+indexing
+Elementwise add, divide, subtract
+In-Place Operations
+Mixed scalar-tensor operations
+In-Place Operations
+max
+Functional ReLU
+2D Matrix Multiply
+Filling out the Tensor class with forward and backward methods
+Congrats on implementing backprop! The next thing we'll do is write implement a bunch of backward functions that we need to train our model at the end of the day, as well as ones that cover interesting cases.
+
+These should be just like your log_back and multiply_back0, multiplyback1 examples earlier.
+
+Non-Differentiable Functions
+For functions like torch.argmax or torch.eq, there's no sensible way to define gradients with respect to the input tensor. For these, we will still use wrap_forward_fn because we still need to unbox the arguments and box the result, but by passing is_differentiable=False we can avoid doing any unnecessary computation.
+
+
+def _argmax(x: Arr, dim=None, keepdim=False):
+    '''Like torch.argmax.'''
+    return np.expand_dims(np.argmax(x, axis=dim), axis=([] if dim is None else dim))
+
+argmax = wrap_forward_fn(_argmax, is_differentiable=False)
+eq = wrap_forward_fn(np.equal, is_differentiable=False)
+
+a = Tensor([1.0, 0.0, 3.0, 4.0], requires_grad=True)
+b = a.argmax()
+assert not b.requires_grad
+assert b.recipe is None
+assert b.item() == 3
+Implementing negative
+torch.negative just performs -x elementwise. Make your own version negative using wrap_forward_fn.
+
+
+def negative_back(grad_out: Arr, out: Arr, x: Arr) -> Arr:
+    '''Backward function for f(x) = -x elementwise.'''
+    pass
+
+negative = wrap_forward_fn(np.negative)
+BACK_FUNCS.add_back_func(np.negative, 0, negative_back)
+
+utils.test_negative_back(Tensor)
+Implementing exp
+Make your own version of torch.exp. The backward function should express the result in terms of the out parameter - this more efficient than expressing it in terms of x.
+
+
+def exp_back(grad_out: Arr, out: Arr, x: Arr) -> Arr:
+    return out * grad_out
+
+exp = wrap_forward_fn(np.exp)
+BACK_FUNCS.add_back_func(np.exp, 0, exp_back)
+
+utils.test_exp_back(Tensor)
+Implementing reshape
+reshape is a bit more complicated than the many functions we've dealt with so far: there is an additional positional argument new_shape. Since it's not a Tensor, we don't need to think about differentiating with respect to it. Remember, new_shape is the argument that gets passed into the forward function, and we're trying to reverse this operation and return to the shape of the input.
+
+Depending how you wrote wrap_forward_fn and backprop, you might need to go back and adjust them to handle this. Or, you might just have to implement reshape_back and everything will work.
+
+Note that the output is a different shape than the input, but this doesn't introduce any additional complications.
+
+
+def reshape_back(grad_out: Arr, out: Arr, x: Arr, new_shape: tuple) -> Arr:
+    pass
+
+reshape = wrap_forward_fn(np.reshape)
+BACK_FUNCS.add_back_func(np.reshape, 0, reshape_back)
+
+utils.test_reshape_back(Tensor)
+permute
+In NumPy, the equivalent of torch.permute is called np.transpose, so we will wrap that.
+
+Help - I'm confused about how to implement `permute_back`.
+
+def permute_back(grad_out: Arr, out: Arr, x: Arr, axes: tuple) -> Arr:
+    pass
+
+BACK_FUNCS.add_back_func(np.transpose, 0, permute_back)
+permute = wrap_forward_fn(np.transpose)
+
+utils.test_permute_back(Tensor)
+expand
+Implement your version of torch.expand.
+
+The backward function should just call unbroadcast.
+
+For the forward function, we will use np.broadcast_to. This function takes in an array and a target shape, and returns a version of the array broadcasted to the target shape using the rules of broadcasting we discussed in an earlier section. For example:
+
+
+>>> x = np.array([1, 2, 3])
+>>> np.broadcast_to(x, (3, 3))
+array([[1, 2, 3],
+       [1, 2, 3],
+       [1, 2, 3]])
+
+>>> x = np.array([[1], [2], [3]])
+>>> np.broadcast_to(x, (3, 3)) # x is already a column; broadcasting is done along rows
+array([[1, 2, 3],
+       [1, 2, 3],
+       [1, 2, 3]])
+The reason we can't just use np.broadcast_to and call it a day is that torch.expand supports -1 for a dimension size meaning "don't change the size". For example:
+
+
+>>> x = torch.tensor([[1], [2], [3]])
+>>> x.expand(-1, 3)
+tensor([[ 1,  1,  1],
+        [ 2,  2,  2],
+        [ 3,  3,  3]])
+So when implementing _expand, you'll need to be a bit careful when constructing the shape to broadcast to.
+
+Help - I'm not sure how to construct the shape.
+
+def expand_back(grad_out: Arr, out: Arr, x: Arr, new_shape: tuple) -> Arr:
+    pass
+
+def _expand(x: Arr, new_shape) -> Arr:
+    '''Like torch.expand, calling np.broadcast_to internally.
+
+    Note torch.expand supports -1 for a dimension size meaning "don't change the size".
+    np.broadcast_to does not natively support this.
+    '''
+    pass
+
+expand = wrap_forward_fn(_expand)
+BACK_FUNCS.add_back_func(_expand, 0, expand_back)
+
+utils.test_expand(Tensor)
+utils.test_expand_negative_length(Tensor)
+sum
+The output can also be smaller than the input, such as when calling torch.sum. Implement your own torch.sum and sum_back.
+
+Note, if you get weird exceptions that you can't explain, and these exceptions don't even go away when you use the solutions provided, this probably means that your implementation of wrap_forward_fn was wrong in a way which wasn't picked up by the tests. You should return to this function and try to fix it (or just use the solution).
+
+
+def sum_back(grad_out: Arr, out: Arr, x: Arr, dim=None, keepdim=False):
+    '''Basic idea: repeat grad_out over the dims along which x was summed'''
+    pass
+
+def _sum(x: Arr, dim=None, keepdim=False) -> Arr:
+    '''Like torch.sum, calling np.sum internally.'''
+    pass
+
+sum = wrap_forward_fn(_sum)
+BACK_FUNCS.add_back_func(_sum, 0, sum_back)
+
+utils.test_sum_keepdim_false(Tensor)
+utils.test_sum_keepdim_true(Tensor)
+utils.test_sum_dim_none(Tensor)
+indexing
+In its full generality, indexing a torch.Tensor is really complicated and there are quite a few cases to handle separately.
+
+We only need two cases today:
+
+The index is an integer or tuple of integers.
+The index is a tuple of (array or Tensor) representing coordinates. Each array is 1D and of equal length. Some coordinates may be repeated. This is Integer array indexing.
+For example, to select the five elements at (0, 0), (1,0), (0, 1), (1, 2), and (0, 0), the index would be the tuple (np.array([0, 1, 0, 1, 0]), np.array([0, 0, 1, 2, 0])).
+Note, in _getitem you'll need to deal with one special case: when index is of type signature tuple[Tensor]. If not for this case, return x[index] would suffice for this function. It might help to define a coerce_index function to deal with this particular case; we've provided a docstring for this purpose.
+
+Help - I'm confused about the implementation of getitem_back!
+
+Index = Union[int, tuple[int, ...], tuple[Arr], tuple[Tensor]]
+
+def _getitem(x: Arr, index: Index) -> Arr:
+    '''Like x[index] when x is a torch.Tensor.'''
+    return x[coerce_index(index)]
+
+
+def getitem_back(grad_out: Arr, out: Arr, x: Arr, index: Index):
+    '''Backwards function for _getitem.
+
+    Hint: use np.add.at(a, indices, b)
+    This function works just like a[indices] += b, except that it allows for repeated indices.
+    '''
+    new_grad_out = np.full_like(x, 0)
+    np.add.at(new_grad_out, coerce_index(index), grad_out)
+    return new_grad_out
+
+getitem = wrap_forward_fn(_getitem)
+BACK_FUNCS.add_back_func(_getitem, 0, getitem_back)
+
+utils.test_getitem_int(Tensor)
+utils.test_getitem_tuple(Tensor)
+utils.test_getitem_integer_array(Tensor)
+utils.test_getitem_integer_tensor(Tensor)
+elementwise add, subtract, divide
+These are exactly analogous to the multiply case. Note that Python and NumPy have the notion of "floor division", which is a truncating integer division as in 7 // 3 = 2. You can ignore floor division: - we only need the usual floating point division which is called "true division".
+
+Use lambda functions to define and register the backward functions each in one line. If you're confused, you can click on the expander below to reveal the first one.
+
+Reveal the first one:
+
+BACK_FUNCS.add_back_func(np.add, 0, lambda grad_out, out, x, y: unbroadcast(grad_out, x))
+
+add = wrap_forward_fn(np.add)
+subtract = wrap_forward_fn(np.subtract)
+true_divide = wrap_forward_fn(np.true_divide)
+
+# Your code goes here
+
+utils.test_add_broadcasted(Tensor)
+utils.test_subtract_broadcasted(Tensor)
+utils.test_truedivide_broadcasted(Tensor)
+
+# %%
+
+def add_(x: Tensor, other: Tensor, alpha: float = 1.0) -> Tensor:
+    '''Like torch.add_. Compute x += other * alpha in-place and return tensor.'''
+    np.add(x.array, other.array * alpha, out=x.array)
+    return x
+
+
+def safe_example():
+    '''This example should work properly.'''
+    a = Tensor([0.0, 1.0, 2.0, 3.0], requires_grad=True)
+    b = Tensor([2.0, 3.0, 4.0, 5.0], requires_grad=True)
+    a.add_(b)
+    c = a * b
+    c.sum().backward()
+    assert a.grad is not None and np.allclose(a.grad.array, [2.0, 3.0, 4.0, 5.0])
+    assert b.grad is not None and np.allclose(b.grad.array, [2.0, 4.0, 6.0, 8.0])
+
+
+def unsafe_example():
+    '''This example is expected to compute the wrong gradients.'''
+    a = Tensor([0.0, 1.0, 2.0, 3.0], requires_grad=True)
+    b = Tensor([2.0, 3.0, 4.0, 5.0], requires_grad=True)
+    c = a * b
+    a.add_(b)
+    c.sum().backward()
+    if a.grad is not None and np.allclose(a.grad.array, [2.0, 3.0, 4.0, 5.0]):
+        print("Grad wrt a is OK!")
+    else:
+        print("Grad wrt a is WRONG!")
+    if b.grad is not None and np.allclose(b.grad.array, [0.0, 1.0, 2.0, 3.0]):
+        print("Grad wrt b is OK!")
+    else:
+        print("Grad wrt b is WRONG!")
+# %%
+
+a = Tensor([0, 1, 2, 3], requires_grad=True)
+(a * 2).sum().backward()
+b = Tensor([0, 1, 2, 3], requires_grad=True)
+(2 * b).sum().backward()
+assert a.grad is not None
+assert b.grad is not None
+assert np.allclose(a.grad.array, b.grad.array)
+
+# %%
+
+def maximum_back0(grad_out: Arr, out: Arr, x: Arr, y: Arr):
+    '''Backwards function for max(x, y) wrt x.'''
+    return unbroadcast(grad_out * ((x > y) + 0.5 * (x == y)), x)
+
+def maximum_back1(grad_out: Arr, out: Arr, x: Arr, y: Arr):
+    '''Backwards function for max(x, y) wrt y.'''
+    return unbroadcast(grad_out * ((y > x) + 0.5 * (x == y)), y)
+
+maximum = wrap_forward_fn(np.maximum)
+
+BACK_FUNCS.add_back_func(np.maximum, 0, maximum_back0)
+BACK_FUNCS.add_back_func(np.maximum, 1, maximum_back1)
+
+utils.test_maximum(Tensor)
+utils.test_maximum_broadcasted(Tensor)
+
+# %%
+
+def relu(x: Tensor) -> Tensor:
+    '''Like torch.nn.function.relu(x, inplace=False).'''
+    return maximum(x, 0)
+
+utils.test_relu(Tensor)
+# %%
+
+def _matmul2d(x: Arr, y: Arr) -> Arr:
+    '''Matrix multiply restricted to the case where both inputs are exactly 2D.'''
+    return x @ y
+
+def matmul2d_back0(grad_out: Arr, out: Arr, x: Arr, y: Arr) -> Arr:
+    return grad_out @ y.T
+
+def matmul2d_back1(grad_out: Arr, out: Arr, x: Arr, y: Arr) -> Arr:
+    return x.T @ grad_out
+
+matmul = wrap_forward_fn(_matmul2d)
+
+BACK_FUNCS.add_back_func(_matmul2d, 0, matmul2d_back0)
+BACK_FUNCS.add_back_func(_matmul2d, 1, matmul2d_back1)
+
+utils.test_matmul2d(Tensor)
 # %%
