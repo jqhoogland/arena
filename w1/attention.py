@@ -1,4 +1,5 @@
 #%%
+import einops
 import numpy as np
 import torch as t
 from fancy_einsum import einsum
@@ -25,7 +26,7 @@ def attention(
 
     A: TensorType["seq_len", "seq_len"] = t.softmax(
         (
-            Q @ K.transpose(-1, -2)
+            einsum("b s h, b t h-> b s t", Q, K)
             / np.sqrt(d_head)
         ), dim=1
     )
@@ -55,7 +56,7 @@ def test_attention():
 test_attention()
 # %%
 
-def mask(A: TensorType["batch", "seq_len", "seq_len"]) -> TensorType["batch", "seq_len", "d_head"]:
+def mask(A: TensorType[..., "seq_len", "seq_len"]) -> TensorType[..., "seq_len", "seq_len"]:
     _, seq_len, _ = A.shape
     return A * t.triu(t.ones(seq_len, seq_len))
     
@@ -95,7 +96,7 @@ def masked_attention(
     _, _, d_head = Q.shape
 
     A_pre: TensorType["batch", "seq_len", "seq_len"] = mask(
-        Q @ K.transpose(-1, -2)
+        einsum("b s h, b t h-> b s t", Q, K)
     ) / np.sqrt(d_head)
 
     A: TensorType["seq_len", "seq_len"] = t.softmax(A_pre, dim=1)
@@ -104,3 +105,58 @@ def masked_attention(
 
 # TODO: how to test?
 # %%
+
+def multihead_masked_attention(
+    Q: TensorType["batch", "seq", "n_heads*headsize"], 
+    K: TensorType["batch", "seq", "n_heads*headsize"], 
+    V: TensorType["batch", "seq", "n_heads*headsize"],
+    num_heads: int
+) -> TensorType["batch", "seq", "n_heads*headsize"]:
+    '''
+    Should return the results of multihead self-attention.
+
+    Q: shape (batch, seq, n_heads*headsize)
+    K: shape (batch, seq, n_heads*headsize)
+    V: shape (batch, seq, n_heads*headsize)
+    num_heads: int
+
+    Return: shape (batch, seq, n_heads*headsize)
+    '''
+    _, _, d_head = Q.shape
+
+    _Q = einops.rearrange(Q, "batch seq (n_heads headsize) -> batch n_heads seq headsize", n_heads=num_heads)    
+    _K = einops.rearrange(K, "batch seq (n_heads headsize) -> batch n_heads seq headsize", n_heads=num_heads)    
+    _V = einops.rearrange(V, "batch seq (n_heads headsize) -> batch n_heads seq headsize", n_heads=num_heads)
+
+    A_pre: TensorType["batch", "n_heads", "seq_len", "seq_len"] = mask(
+        einsum("b h s c, b h t c -> b h s t", _Q, _K)
+    ) / np.sqrt(d_head)
+
+    A: TensorType["seq_len", "seq_len"] = t.softmax(A_pre, dim=1)
+
+    return einops.rearrange(A @ _V, "batch n_heads seq headsize -> batch seq (n_heads headsize)") 
+
+# %%
+
+class MultiheadMaskedAttention(nn.Module):
+    W_QKV: nn.Linear
+    W_O: nn.Linear
+
+    def __init__(self, hidden_size: int, num_heads: int):
+        self.hidden_size = hidden_size
+        self.num_heads = num_heads
+
+        super().__init__()
+
+        self.W_QKV = nn.Linear(hidden_size, hidden_size * num_heads * 3)
+        self.W_O = nn.Linear(hidden_size * num_heads, hidden_size)
+
+    def forward(self, x: TensorType["batch", "seq", "hidden_size"]) -> TensorType["batch", "seq", "hidden_size"]:
+        '''
+        x: shape (batch, seq, hidden_size)
+
+        Return: shape (batch, seq, hidden_size)
+        '''
+        QKV = self.W_QKV(x)
+        Q, K, V = QKV.chunk(3, dim=2)
+        return self.W_O(multihead_masked_attention(Q, K, V, self.num_heads))
