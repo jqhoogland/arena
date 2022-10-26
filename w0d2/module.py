@@ -76,6 +76,9 @@ class Linear(nn.Module):
         The fields should be named `weight` and `bias` for compatibility with PyTorch.
         If `bias` is False, set `self.bias` to None.
         '''
+        self.in_features = in_features
+        self.out_features = out_features
+
         super().__init__()
 
         self.weight = nn.parameter.Parameter((uniform_random((out_features, in_features), 1. / np.sqrt(in_features))))
