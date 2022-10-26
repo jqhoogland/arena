@@ -4,7 +4,8 @@ import re
 import time
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Any, Callable, Iterable, Iterator, Optional, Protocol, Union
+from typing import (Any, Callable, Iterable, Iterator, Optional, Protocol,
+                    TypeVar, Union)
 
 import numpy as np
 from arena.w0_bonus import utils
@@ -420,14 +421,16 @@ class Node:
 def get_children(node: Node) -> list[Node]:
     return node.children
 
-def topological_sort(node: Node, get_children_fn: Callable) -> list[Any]:
+T = TypeVar("T")
+
+def topological_sort(node: T, get_children_fn: Callable[[T], list[T]]) -> list[T]:
     '''
     Return a list of node's descendants in reverse topological order from future to past.
 
     Should raise an error if the graph with `node` as root is not in fact acyclic.
     '''
     
-    def dfs(node: Node, visited: set[Node], stack: list[Node], path: set[Node] = set()):
+    def dfs(node: T, visited: set[T], stack: list[T], path: set[T] = set()):
         visited.add(node)
 
         for child in get_children_fn(node):
@@ -446,4 +449,85 @@ utils.test_topological_sort_linked_list(topological_sort)
 utils.test_topological_sort_branching(topological_sort)
 utils.test_topological_sort_rejoining(topological_sort)
 utils.test_topological_sort_cyclic(topological_sort)
+# %%
+
+def get_parents(node: Tensor) -> list[Tensor]:
+    if node.recipe is None:
+        return []
+    else:
+        return list(node.recipe.parents.values())
+
+def sorted_computational_graph(node: Tensor) -> list[Tensor]:
+    '''
+    For a given tensor, return a list of Tensors that make up the nodes of the given Tensor's computational graph, in reverse topological order.
+    '''
+    return topological_sort(node, get_parents)
+
+a = Tensor([1], requires_grad=True)
+b = Tensor([2], requires_grad=True)
+c = Tensor([3], requires_grad=True)
+d = a * b
+e = c.log()
+f = d * e
+g = f.log()
+name_lookup = {a: "a", b: "b", c: "c", d: "d", e: "e", f: "f", g: "g"}
+
+print([name_lookup[t] for t in sorted_computational_graph(g)])
+# Should get something in reverse alphabetical order (or close)
+
+# %%
+
+def backprop(end_node: Tensor, end_grad: Optional[Tensor] = None) -> None:
+    '''Accumulates gradients in the grad field of each leaf node.
+
+    tensor.backward() is equivalent to backprop(tensor).
+
+    end_node: 
+        The rightmost node in the computation graph. 
+        If it contains more than one element, end_grad must be provided.
+    end_grad: 
+        A tensor of the same shape as end_node. 
+        Set to 1 if not specified and end_node has only one element.
+    '''
+
+    # Get value of end_grad_arr
+    end_grad_arr = np.ones_like(end_node.array) if end_grad is None else end_grad.array
+
+    # Create dict to store gradients
+    grads: dict[Tensor, Arr] = {end_node: end_grad_arr}
+
+    # Iterate through the computational graph, using your sorting function
+    for node in sorted_computational_graph(end_node):
+
+        # Get the outgradient (recall we need it in our backward functions)
+        outgrad = grads.pop(node)
+        # We only store the gradients if this node is a leaf (see the is_leaf property of Tensor)
+        if node.is_leaf:
+            # Add the gradient to this node's grad (need to deal with special case grad=None)
+            if node.grad is None:
+                node.grad = Tensor(outgrad)
+            else:
+                node.grad.array += outgrad
+
+        # If node has no recipe, then it has no parents, i.e. the backtracking through computational
+        # graph ends here
+        if node.recipe is None:
+            continue
+
+        # If node has a recipe, then we iterate through parents (which is a dict of {arg_posn: tensor})
+        for argnum, parent in node.recipe.parents.items():
+
+            # Get the backward function corresponding to the function that created this node,
+            # and the arg posn of this particular parent within that function 
+            back_fn = BACK_FUNCS.get_back_func(node.recipe.func, argnum)
+
+            # Use this backward function to calculate the gradient
+            in_grad = back_fn(outgrad, node.array, *node.recipe.args, **node.recipe.kwargs)
+
+            # Add the gradient to this node in the dictionary `grads`
+            # Note that we only change the grad of the node itself in the code block above
+            if grads.get(parent) is None:
+                grads[parent] = in_grad
+            else:
+                grads[parent] += in_grad
 # %%
