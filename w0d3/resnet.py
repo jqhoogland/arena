@@ -1,25 +1,22 @@
 #%%
 import json
 from pathlib import Path
-from typing import Callable, Optional, Tuple, Union
 from pprint import pp
+from typing import Callable, Optional, Tuple, Union
 
 import PIL
 import plotly.express as px
 import plotly.graph_objects as go
 import torch as t
 import torchvision
+from arena.w0d2.module import Conv2d, Flatten, Linear, MaxPool2d, ReLU
 from arena.w0d3 import utils
 from PIL import Image
 from plotly.subplots import make_subplots
 from torch import nn
 from torch.utils.data import DataLoader
-from torchvision import datasets, transforms
+from torchvision import datasets, models, transforms
 from tqdm import tqdm
-
-from torchvision import models
-
-from arena.w0d2.module import MaxPool2d, Conv2d, Flatten, Linear, ReLU
 
 # %%
 
