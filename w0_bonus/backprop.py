@@ -1,4 +1,5 @@
 # %%
+import itertools
 import os
 import re
 import time
@@ -6,12 +7,11 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import (Any, Callable, Iterable, Iterator, Optional, Protocol,
                     TypeVar, Union)
-import itertools
 
 import numpy as np
 from arena.w0_bonus import utils
+from arena.w0d2.module import uniform_random
 from einops import repeat
-
 
 # %%
 
@@ -1109,5 +1109,71 @@ assert list(mod.parameters()) == [
 ], "parameters should come before submodule parameters"
 print("Manually verify that the repr looks reasonable:")
 print(mod)
+
+# %%
+
+
+class Linear(nn.Module):
+    def __init__(self, in_features: int, out_features: int, bias=True):
+        '''A simple linear (technically, affine) transformation.
+
+        The fields should be named `weight` and `bias` for compatibility with PyTorch.
+        If `bias` is False, set `self.bias` to None.
+        '''
+        self.in_features = in_features
+        self.out_features = out_features
+
+        super().__init__()
+
+        self.weight = Parameter((uniform_random((out_features, in_features), 1. / np.sqrt(in_features))))
+        self.bias = Parameter((uniform_random((out_features, ), 1. /np.sqrt(in_features)))) \
+            if bias else None
+
+
+    def forward(self, x: t.Tensor) -> t.Tensor:
+        '''
+        x: shape (*, in_features)
+        Return: shape (*, out_features)
+        ''' 
+        bias = self.bias if self.bias is not None else 0.
+
+        return x @ self.weight.permute((1, 0)) + bias
+        
+    def extra_repr(self) -> str:
+        bias = self.bias and True
+        return f"in_features={self.in_features}, out_features={self.out_features}, bias={bias}"
+
+# %%
+
+
+class MLP(Module):
+    def __init__(self):
+        super().__init__()
+        self.linear1 = Linear(28 * 28, 64)
+        self.linear2 = Linear(64, 64)
+        self.output = Linear(64, 10)
+
+    def forward(self, x):
+        x = x.reshape((x.shape[0], 28 * 28))
+        x = relu(self.linear1(x))
+        x = relu(self.linear2(x))
+        x = self.output(x)
+        return x
+# %%
+
+
+def cross_entropy(logits: Tensor, true_labels: Tensor) -> Tensor:
+    '''Like torch.nn.functional.cross_entropy with reduction='none'.
+
+    logits: shape (batch, classes)
+    true_labels: shape (batch,). Each element is the index of the correct label in the logits.
+
+    Return: shape (batch, ) containing the per-example loss.
+    '''
+    n_batch, n_class = logits.shape
+    true = logits[arange(0, n_batch), true_labels]
+    return -log(exp(true) / exp(logits).sum(1))
+
+utils.test_cross_entropy(Tensor, cross_entropy)
 
 # %%
