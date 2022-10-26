@@ -216,8 +216,8 @@ def test_multiply_float(Tensor, multiply):
 def test_sum(Tensor):
     # This tests keyword arguments
     a = Tensor(np.array([[0.0, 1.0], [2.0, 3.0]]), requires_grad=True)
-    assert a.sum(0).shape == (2,)
-    assert a.sum(0, True).shape == (1, 2)
+    assert sum(a, 0).shape == (2,)
+    assert sum(a, 0, True).shape == (1, 2)
     print("All tests in `test_sum` passed!")
     
 
