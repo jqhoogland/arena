@@ -6,10 +6,12 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import (Any, Callable, Iterable, Iterator, Optional, Protocol,
                     TypeVar, Union)
+import itertools
 
 import numpy as np
 from arena.w0_bonus import utils
 from einops import repeat
+
 
 # %%
 
@@ -998,4 +1000,114 @@ BACK_FUNCS.add_back_func(_matmul2d, 0, matmul2d_back0)
 BACK_FUNCS.add_back_func(_matmul2d, 1, matmul2d_back1)
 
 utils.test_matmul2d(Tensor)
+# %%
+
+class Parameter(Tensor):
+    def __init__(self, tensor: Tensor, requires_grad=True):
+        '''Share the array with the provided tensor.'''
+        super().__init__(tensor.array, requires_grad=requires_grad)
+
+    def __repr__(self):
+        return f"Parameter containing: {super().__repr__()}"
+
+x = Tensor([1.0, 2.0, 3.0])
+p = Parameter(x)
+assert p.requires_grad
+assert p.array is x.array
+assert repr(p) == "Parameter containing: Tensor(array([1., 2., 3.]), requires_grad=True)"
+x.add_(Tensor(np.array(2.0)))
+assert np.allclose(
+    p.array, np.array([3.0, 4.0, 5.0])
+), "in-place modifications to the original tensor should affect the parameter"
+
+# %%
+
+class Module:
+    _modules: dict[str, "Module"]
+    _parameters: dict[str, Parameter]
+
+    def __init__(self):
+        self._modules = {}
+        self._parameters = {}
+
+    def modules(self):
+        '''Return the direct child modules of this module.'''
+        return self.__dict__["_modules"].values()
+
+    def parameters(self, recurse: bool = True) -> Iterator[Parameter]:
+        '''Return an iterator over Module parameters.
+
+        recurse: if True, the iterator includes parameters of submodules, recursively.
+        '''
+        _parameters = iter(self._parameters.values())
+
+        if recurse:
+            for module in self.modules():
+                _parameters = itertools.chain(_parameters, module.parameters(recurse=True))
+
+        return _parameters
+
+    def __setattr__(self, key: str, val: Any) -> None:
+        '''
+        If val is a Parameter or Module, store it in the appropriate _parameters or _modules dict.
+        Otherwise, call the superclass.
+        '''
+        if isinstance(val, Parameter):
+            self._parameters[key] = val
+        elif isinstance(val, Module):
+            self._modules[key] = val
+        
+        super().__setattr__(key, val)
+
+    def __getattr__(self, key: str) -> Union[Parameter, "Module"]:
+        '''
+        If key is in _parameters or _modules, return the corresponding value.
+        Otherwise, raise KeyError.
+        '''
+        
+        if key in self.__dict__["_parameters"]:
+            return self.__dict__["_parameters"][key]
+        if key in self.__dict__["_modules"]:
+            return self.__dict__["_modules"][key]
+        
+        super().__getattr__(key)
+
+    def __call__(self, *args, **kwargs):
+        return self.forward(*args, **kwargs)
+
+    def forward(self):
+        raise NotImplementedError("Subclasses must implement forward!")
+
+    def __repr__(self):
+        def _indent(s_, numSpaces):
+            return re.sub("\n", "\n" + (" " * numSpaces), s_)
+        lines = [f"({key}): {_indent(repr(module), 2)}" for key, module in self._modules.items()]
+        return "".join([
+            self.__class__.__name__ + "(",
+            "\n  " + "\n  ".join(lines) + "\n" if lines else "", ")"
+        ])
+
+
+class TestInnerModule(Module):
+    def __init__(self):
+        super().__init__()
+        self.param1 = Parameter(Tensor([1.0]))
+        self.param2 = Parameter(Tensor([2.0]))
+
+class TestModule(Module):
+    def __init__(self):
+        super().__init__()
+        self.inner = TestInnerModule()
+        self.param3 = Parameter(Tensor([3.0]))
+
+mod = TestModule()
+assert list(mod.modules()) == [mod.inner]
+assert list(mod.parameters()) == [
+    mod.param3,
+    mod.inner.param1,
+    mod.inner.param2,
+], "parameters should come before submodule parameters"
+print("Manually verify that the repr looks reasonable:")
+print(mod)
+
 # %%
