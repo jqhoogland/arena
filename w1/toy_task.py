@@ -33,7 +33,7 @@ test_dataloader = DataLoader(test_data, batch_size=64, shuffle=True)
 
 config = TransformerConfig(
     vocab_size=100,
-    hidden_size=32,
+    hidden_size=128,
     num_layers=4,
     num_heads=4,
     max_seq_len=10
@@ -46,7 +46,7 @@ loss = t.tensor(0.)
 loss_fn = nn.CrossEntropyLoss()
 optimizer = t.optim.Adam(transformer.parameters(), lr=1e-3)
 
-for epoch in range(20):
+for epoch in range(10):
     for batch in train_dataloader:
         input_, target = batch
 
