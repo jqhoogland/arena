@@ -64,7 +64,6 @@ def mask(A: TensorType[..., "seq_len", "seq_len"]) -> TensorType[..., "seq_len",
     seq_len = A.shape[-1]
 
     mask = t.triu(t.ones(seq_len, seq_len), diagonal=1).bool()
-
     return A.masked_fill(mask, -np.inf)
 
 

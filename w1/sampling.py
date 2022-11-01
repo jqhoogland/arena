@@ -1,4 +1,4 @@
-#%%
+# %%
 import torch as t
 import torch.nn.functional as F
 import transformers
@@ -76,15 +76,15 @@ def sample_top_k(logits: t.Tensor, top_k: int) -> int:
     Return: a sampled token
     '''
     assert top_k > 0
-    _, top_k_indices = logits.topk(top_k)
+    _top_k_logits, top_k_indices = logits.topk(top_k)
 
     top_k_logits = t.ones_like(logits) * float("-inf")
-    top_k_logits[top_k_indices] = logits[top_k_indices]
+    top_k_logits[top_k_indices] = _top_k_logits
 
     return sample_basic(top_k_logits)
 
 def test_sample_top_k():
-    N = 10000
+    N = 10_000
     k = 3
     probs = t.linspace(0, 0.4, 5)
     unnormalized_logits = probs.log() + 1.2345
