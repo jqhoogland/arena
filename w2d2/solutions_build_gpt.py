@@ -15,7 +15,7 @@ from fancy_einsum import einsum
 import utils
 
 device = t.device("cuda" if t.cuda.is_available() else "cpu")
-# assert str(device) == "cuda"
+assert str(device) == "cuda"
 
 # %%
 # ============================= CONFIG =============================
