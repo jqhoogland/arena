@@ -141,13 +141,7 @@ def multihead_masked_attention(
 
     A: TensorType["b", "n", "s_q", "s_k"] = t.softmax(A_pre, dim=-1)
     AV: TensorType["b", "n", "s_q", "h"] = einsum("b n s_q s_k, b n s_k h -> b n s_q h", A, _V)
-
-    # print("A", A)
-    # print("V", V)
-    # print(AV)
-
-    # print(A, V)
-
+    
     return einops.rearrange(AV, "b n s h -> b s (n h)") 
 
 
