@@ -70,10 +70,6 @@ testloader = DataLoader(testset, batch_size=64, shuffle=True)
 
 # %%
 
-device = t.device('cuda:0' if t.cuda.is_available() else 'cpu')
-
-# %%
-
 epochs = 3
 loss_fn = nn.CrossEntropyLoss()
 batch_size = 128

@@ -113,15 +113,14 @@ def sample_top_p(logits: t.Tensor, top_p: float, min_tokens_to_keep: int = 1) ->
     sorted_logits, sorted_indices = logits.sort(descending=True)
     cumulative_probs = F.softmax(sorted_logits, dim=0).cumsum(dim=0)
 
-    reject_index = min(t.searchsorted(cumulative_probs, top_p) + 1, len(sorted_indices))
+    reject_index = min(t.searchsorted(cumulative_probs, top_p).item() + 1, len(sorted_indices))
     top_p_indices = sorted_indices[:reject_index]
 
     top_p_logits = t.ones_like(logits) * float("-inf")
     top_p_logits[top_p_indices] = logits[top_p_indices]
-
+    
     return sample_basic(top_p_logits)
     
-
 def test_sample_top_p():
     N = 2000
     unnormalized_logits = t.tensor([0.2, 0.3, 0.5]).log() + 2.3456
