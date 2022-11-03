@@ -1,9 +1,9 @@
 #%% 
 import torch as t
-from arena.w1.attention import DecoderOnlyTransformer, TransformerConfig
 from torch import nn
 from torch.utils.data import DataLoader, Dataset
 
+from arena.w1.attention import DecoderOnlyTransformer, TransformerConfig
 #%%
 
 class ReverseASequenceDataset(Dataset):
@@ -75,3 +75,7 @@ for batch in test_dataloader:
     loss = loss_fn(output.reshape(-1, 100), target.reshape(-1))
     print("\n")
 # %%
+
+
+# [1, 2, 3, 4, 5, 6, 7, 8] -> [#, #, #, #, 4, 4, 2, 1]
+# "To be or not to be." -> "be or not to be. Whether"
