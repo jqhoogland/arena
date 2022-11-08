@@ -7,7 +7,7 @@ from torch.utils.data import DataLoader, Dataset
 #%%
 
 class ReverseASequenceDataset(Dataset):
-    def __init__(self, seq_len, total_size):
+    def __init__(self, seq_len: int, total_size: int):
         self.seq_len = seq_len
         self.total_size = total_size
 
@@ -23,7 +23,7 @@ class ReverseASequenceDataset(Dataset):
         return input_, target
 # %%
 
-train_data = ReverseASequenceDataset(10, 10000)
+train_data = ReverseASequenceDataset(10, 10_000)
 test_data = ReverseASequenceDataset(10, 100)
 
 train_dataloader = DataLoader(train_data, batch_size=64, shuffle=True)
@@ -47,9 +47,7 @@ loss_fn = nn.CrossEntropyLoss()
 optimizer = t.optim.Adam(transformer.parameters(), lr=1e-3)
 
 for epoch in range(10):
-    for batch in train_dataloader:
-        input_, target = batch
-
+    for input_, target in train_dataloader:
         output = transformer(input_)
         loss = loss_fn(output.reshape(-1, 100), target.reshape(-1))
 
@@ -77,5 +75,3 @@ for batch in test_dataloader:
     loss = loss_fn(output.reshape(-1, 100), target.reshape(-1))
     print("\n")
 # %%
-
-# TODO: The model is just learning to repeat guesses. I need to play around with longer training runs & different hyperparameter combos
