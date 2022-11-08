@@ -128,3 +128,67 @@ class SGD:
 utils.test_sgd(SGD)
 
 # %%
+
+
+class RMSprop:
+    def __init__(
+        self,
+        params: Iterable[t.nn.parameter.Parameter],
+        lr: float,
+        alpha: float,
+        eps: float,
+        weight_decay: float,
+        momentum: float,
+    ):
+        """Implements RMSprop.
+
+        Like the PyTorch version, but assumes centered=False
+            https://pytorch.org/docs/stable/generated/torch.optim.RMSprop.html#torch.optim.RMSprop
+        """
+        self.params = list(params)
+        self.lr = lr
+        self.momentum = momentum
+        self.weight_decay = weight_decay
+        self.alpha = alpha
+        self.eps = eps
+
+        self.momentum_buffer = [t.zeros_like(param) for param in self.params]
+        self.sq_buffer = [t.zeros_like(param) for param in self.params]
+
+    def zero_grad(self) -> None:
+        for param in self.params:
+            param.grad = None
+
+    def step(self) -> None:
+        # Requires that the gradients have already been computed (with `backward()`)
+        with t.inference_mode():
+            for param, momentum, sq in zip(
+                self.params, self.momentum_buffer, self.sq_buffer
+            ):
+                if param.grad is None:
+                    continue
+                if param.grad.is_sparse:
+                    raise RuntimeError("Sparse gradients are not supported")
+
+                if self.weight_decay:
+                    param.grad += self.weight_decay * param
+
+                sq.mul_(self.alpha).add_((1 - self.alpha) * param.grad**2)
+
+                if self.momentum:
+                    momentum.mul_(self.momentum).add_(
+                        param.grad / (sq.sqrt() + self.eps)
+                    )
+                    param.add_(-self.lr * momentum)
+                else:
+                    param.add_(-self.lr * param.grad / (sq.sqrt() + self.eps))
+
+    def __repr__(self) -> str:
+        return "RMSProp(lr={}, momentum={}, weight_decay={}, alpha={}, eps={})".format(
+            self.lr, self.momentum, self.weight_decay, self.alpha, self.eps
+        )
+
+
+utils.test_rmsprop(RMSprop)
+
+# %%
