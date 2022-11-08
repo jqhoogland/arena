@@ -75,7 +75,7 @@ class SGD:
     def __init__(
         self,
         params: Iterable[t.nn.parameter.Parameter],
-        lr: float,
+        lr: float = 1e-3,
         momentum: float = 0.0,
         weight_decay: float = 0.0,
     ):
@@ -134,11 +134,11 @@ class RMSprop:
     def __init__(
         self,
         params: Iterable[t.nn.parameter.Parameter],
-        lr: float,
-        alpha: float,
-        eps: float,
-        weight_decay: float,
-        momentum: float,
+        lr: float = 1e-3,
+        alpha: float = 0.99,
+        eps: float = 1e-8,
+        weight_decay: float = 0.0,
+        momentum: float = 0.0,
     ):
         """Implements RMSprop.
 
@@ -239,11 +239,11 @@ class Adam:
                 v_hat = v / (1 - (self.betas[1] ** self.t))
 
                 param.add_(-self.lr * m_hat / (v_hat.sqrt() + self.eps))
-            
+
             self.t += 1
 
     def __repr__(self) -> str:
-        return "Adam(lr={}, betas={}, weight_decay={}, alpha={}, eps={})".format(
+        return "Adam(lr={}, betas={}, weight_decay={}, eps={})".format(
             self.lr, self.betas, self.weight_decay, self.eps
         )
 
@@ -251,3 +251,42 @@ class Adam:
 utils.test_adam(Adam)
 
 # %%
+
+
+def opt_fn(
+    fn: callable, xy: t.Tensor, optimizer_class, optimizer_kwargs, n_iters: int = 100
+):
+    """Optimize the a given function starting from the specified point.
+
+    optimizer_class: one of the optimizers you've defined, either SGD, RMSprop, or Adam
+    optimzer_kwargs: keyword arguments passed to your optimiser (e.g. lr and weight_decay)
+    """
+    assert xy.requires_grad
+    optimizer = optimizer_class([xy], **optimizer_kwargs)
+
+    out = [xy.detach().clone()]
+
+    for _ in range(n_iters):
+        optimizer.zero_grad()
+        loss = fn(*xy)
+        loss.backward()
+        optimizer.step()
+        out.append(xy.detach().clone())
+
+    return t.stack(out)
+
+xy = t.tensor([-1.5, 3], requires_grad=True)
+x_range = [-2, 2]
+y_range = [-1, 3]
+optimizers = [
+    (SGD, dict(lr=1e-3, momentum=0.9, weight_decay=0.1)),
+    (RMSprop, dict(lr=1e-3, momentum=0.9, weight_decay=0.1)),
+    (Adam, dict(lr=1e-3, weight_decay=0.1)),
+]
+
+fig = utils.plot_optimization(opt_fn, rosenbrocks_banana, xy, optimizers, x_range, y_range)
+
+fig.show()
+fig
+# %%
+
