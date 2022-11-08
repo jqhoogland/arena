@@ -1,13 +1,15 @@
+from typing import Callable
+
+import plotly.express as px
+import plotly.graph_objects as go
 import torch as t
+from einops import repeat
+from plotly.subplots import make_subplots
+from sklearn.datasets import make_moons
 from torch import nn, optim
 from torch.nn import functional as F
 from torch.utils.data import DataLoader, TensorDataset
-from sklearn.datasets import make_moons
-from einops import repeat
-import plotly.express as px
-import plotly.graph_objects as go
-from plotly.subplots import make_subplots
-from typing import Callable
+
 
 class Net(nn.Module):
     def __init__(self, in_dim: int, hidden_dim: int, out_dim: int):
