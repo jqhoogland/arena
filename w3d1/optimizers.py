@@ -192,3 +192,62 @@ class RMSprop:
 utils.test_rmsprop(RMSprop)
 
 # %%
+class Adam:
+    def __init__(
+        self,
+        params: Iterable[t.nn.parameter.Parameter],
+        lr: float = 1e-3,
+        betas: tuple[float, float] = (0.9, 0.999),
+        eps: float = 1e-8,
+        weight_decay: float = 0.0,
+    ):
+        """Implements Adam.
+
+        Like the PyTorch version, but assumes amsgrad=False and maximize=False
+            https://pytorch.org/docs/stable/generated/torch.optim.Adam.html#torch.optim.Adam
+        """
+        self.params = list(params)
+        self.lr = lr
+        self.betas = betas
+        self.weight_decay = weight_decay
+        self.eps = eps
+
+        self.m_buffer = [t.zeros_like(param) for param in self.params]
+        self.v_buffer = [t.zeros_like(param) for param in self.params]
+        self.t = 1
+
+    def zero_grad(self) -> None:
+        for param in self.params:
+            param.grad = None
+
+    def step(self) -> None:
+        # Requires that the gradients have already been computed (with `backward()`)
+        with t.inference_mode():
+            for param, m, v in zip(self.params, self.m_buffer, self.v_buffer):
+                if param.grad is None:
+                    continue
+                if param.grad.is_sparse:
+                    raise RuntimeError("Sparse gradients are not supported")
+
+                if self.weight_decay:
+                    param.grad += self.weight_decay * param
+
+                m.mul_(self.betas[0]).add_((1 - self.betas[0]) * param.grad)
+                v.mul_(self.betas[1]).add_((1 - self.betas[1]) * (param.grad**2))
+
+                m_hat = m / (1 - (self.betas[0] ** self.t))
+                v_hat = v / (1 - (self.betas[1] ** self.t))
+
+                param.add_(-self.lr * m_hat / (v_hat.sqrt() + self.eps))
+            
+            self.t += 1
+
+    def __repr__(self) -> str:
+        return "Adam(lr={}, betas={}, weight_decay={}, alpha={}, eps={})".format(
+            self.lr, self.betas, self.weight_decay, self.eps
+        )
+
+
+utils.test_adam(Adam)
+
+# %%
