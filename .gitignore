@@ -3,3 +3,10 @@
 w0d3/hymenoptera_data
 
 **/data/**
+**/shakespeare.txt
+**/100-0.txt
+
+**/wandb
+
+**/MNIST/**
+**.pyc

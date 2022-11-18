@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import numpy as np
 import pandas as pd
 import plotly.express as px
@@ -5,6 +6,14 @@ import torch as t
 from IPython.display import display
 from torch import nn
 
+=======
+import torch as t
+from torch import nn
+import plotly.express as px
+from IPython.display import display
+import pandas as pd
+import numpy as np
+>>>>>>> refs/remotes/github/main
 
 def test_embedding(Embedding):
     """Indexing into the embedding should fetch the corresponding rows of the embedding."""
@@ -111,12 +120,19 @@ def plot_gelu(GELU):
     px.line(x=x, y=gelu(x), template="ggplot2").show()
 
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> refs/remotes/github/main
 def print_param_count(*models, display_df=True, use_state_dict=False):
     """
     display_df: bool
         If true, displays styled dataframe
         if false, returns dataframe
+<<<<<<< HEAD
+=======
+
+>>>>>>> refs/remotes/github/main
     use_state_dict: bool
         If true, uses model.state_dict() to construct dataframe
             This will include buffers, not just params
@@ -126,8 +142,13 @@ def print_param_count(*models, display_df=True, use_state_dict=False):
     df_list = []
     gmap_list = []
     for i, model in enumerate(models, start=1):
+<<<<<<< HEAD
         print(f"Model {i}, total params = {sum([param.numel() for name, param in model.named_parameters()])}")
         iterator = model.state_dict().items() if use_state_dict else model.named_parameters()
+=======
+        iterator = model.state_dict().items() if use_state_dict else model.named_parameters()
+        print(f"Model {i}, total params = {sum([param.numel() for name, param in iterator])}")
+>>>>>>> refs/remotes/github/main
         df = pd.DataFrame([
             {f"name_{i}": name, f"shape_{i}": tuple(param.shape), f"num_params_{i}": param.numel()}
             for name, param in iterator
@@ -135,7 +156,10 @@ def print_param_count(*models, display_df=True, use_state_dict=False):
             {f"num_params_{i}": param.numel(), f"shape_{i}": tuple(param.shape), f"name_{i}": name}
             for name, param in iterator
         ])
+<<<<<<< HEAD
         display(df)
+=======
+>>>>>>> refs/remotes/github/main
         df_list.append(df)
         gmap_list.append(np.log(df[f"num_params_{i}"]))
     df = df_list[0] if len(df_list) == 1 else pd.concat(df_list, axis=1).fillna(0)
@@ -175,4 +199,8 @@ def test_load_pretrained_weights(model, tokenizer):
     print("Prompt: ", prompt)
     print("Your model's top 10 predictions: ", next_tokens)
     assert " Washington" in next_tokens
+<<<<<<< HEAD
     assert " Bush" in next_tokens
+=======
+    assert " Bush" in next_tokens
+>>>>>>> refs/remotes/github/main
