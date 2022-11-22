@@ -48,13 +48,6 @@ print(f"Manually verify that this is an informative repr: {m}")
 # %%
 
 
-class ReLU(nn.Module):
-    def forward(self, x: t.Tensor) -> t.Tensor:
-        return (x > 0) * x
-
-
-utils.test_relu(ReLU)
-
 # %%
 
 
@@ -211,20 +204,6 @@ class Embedding(nn.Module):
 utils.test_embedding(Embedding)
 
 # %%
-
-class GELU(nn.Module):
-
-    def forward(self, x: t.Tensor) -> t.Tensor:
-        # Exact
-        return 0.5 * x * (1. + t.erf(x / np.sqrt(2.)))
-
-        # Approx 1
-        # return x * t.sigmoid(1.702 * x)
-
-        # Approx 2
-        # return 0.5 * x * (1. + t.tanh(np.sqrt(2. / np.pi) * (x + 0.044715 * x ** 3)))
-
-utils.plot_gelu(GELU)
 
 # %%
 

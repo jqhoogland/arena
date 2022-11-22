@@ -22,20 +22,7 @@ from arena.resnets import utils
 # %%
 
 
-class Sequential(nn.Module):
-    def __init__(self, *modules: nn.Module):
-        super().__init__()
-        for i, mod in enumerate(modules):
-            self.add_module(str(i), mod)
 
-    def forward(self, x: t.Tensor) -> t.Tensor:
-        """Chain each module together, with the output from one feeding into the next one."""
-        for mod in self._modules.values():
-            x = mod(x)
-        return x
-
-
-# %%
 
 
 class BatchNorm2d(nn.Module):
