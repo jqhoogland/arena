@@ -1,7 +1,7 @@
 import numpy as np
 import torch as t
 
-from arena.torchish.nn.activations import Module
+from arena.mintorch.nn.containers import Module
 
 
 class ReLU(Module):

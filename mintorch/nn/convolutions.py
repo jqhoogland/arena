@@ -92,57 +92,6 @@ utils.test_conv2d_minimal(conv2d_minimal)
 # %%
 
 
-def pad1d(x: t.Tensor, left: int, right: int, pad_value=0.0) -> t.Tensor:
-    """Return a new tensor with padding applied to the edges.
-
-    x: shape (batch, in_channels, width), dtype float32
-
-    Return: shape (batch, in_channels, left + right + width)
-    """
-    batch_size, n_in_channels, width = x.shape
-
-    x_padded = (
-        t.ones((batch_size, n_in_channels, left + width + right), dtype=x.dtype)
-        * pad_value
-    )
-    x_padded[..., left : left + width] = x
-
-    return x_padded
-
-
-utils.test_pad1d(pad1d)
-utils.test_pad1d_multi_channel(pad1d)
-# %%
-
-
-def pad2d(
-    x: t.Tensor, left: int, right: int, top: int, bottom: int, pad_value=0.0
-) -> t.Tensor:
-    """Return a new tensor with padding applied to the edges.
-
-    x: shape (batch, in_channels, height, width), dtype float32
-
-    Return: shape (batch, in_channels, top + height + bottom, left + width + right)
-    """
-    batch_size, n_in_channels, height, width = x.shape
-
-    x_padded = (
-        t.ones(
-            (batch_size, n_in_channels, top + height + bottom, left + width + right),
-            dtype=x.dtype,
-        )
-        * pad_value
-    )
-    x_padded[..., top : top + height, left : left + width] = x
-
-    return x_padded
-
-
-utils.test_pad2d(pad2d)
-utils.test_pad2d_multi_channel(pad2d)
-# %%
-
-
 def conv1d(x, weights, stride: int = 1, padding: int = 0) -> t.Tensor:
     """Like torch's conv1d using bias=False.
 
@@ -175,22 +124,6 @@ def conv1d(x, weights, stride: int = 1, padding: int = 0) -> t.Tensor:
 
 
 utils.test_conv1d(conv1d)
-
-# %%
-
-IntOrPair = int | tuple[int, int]
-Pair = tuple[int, int]
-
-
-def force_pair(v: IntOrPair) -> Pair:
-    """Convert v to a pair of int, if it isn't already."""
-    if isinstance(v, tuple):
-        if len(v) != 2:
-            raise ValueError(v)
-        return (int(v[0]), int(v[1]))
-    elif isinstance(v, int):
-        return (v, v)
-    raise ValueError(v)
 
 
 # %%
@@ -251,54 +184,50 @@ utils.test_conv2d(conv2d)
 # %%
 
 
-def maxpool2d(
-    x: t.Tensor,
-    kernel_size: IntOrPair,
-    stride: IntOrPair | None = None,
-    padding: IntOrPair = 0,
-) -> t.Tensor:
-    """Like PyTorch's maxpool2d.
+class Conv2d(nn.Module):
+    def __init__(
+        self,
+        in_channels: int,
+        out_channels: int,
+        kernel_size: IntOrPair,
+        stride: IntOrPair = 1,
+        padding: IntOrPair = 0,
+        bias=True,
+    ):
+        """
+        Same as torch.nn.Conv2d with bias=False.
 
-    x: shape (batch, channels, height, width)
-    stride: if None, should be equal to the kernel size
+        Name your weight field `self.weight` for compatibility with the PyTorch version.
+        """
+        self.in_channels = in_channels
+        self.out_channels = out_channels
+        self.kernel_size = self.kernel_width, self.kernel_height = force_pair(
+            kernel_size
+        )
+        self.stride = stride
+        self.padding = padding
 
-    Return: (batch, channels, out_height, output_width)
-    """
-    kernel_height, kernel_width = force_pair(kernel_size)
-    stride_y, stride_x = (
-        force_pair(stride) if stride is not None else (kernel_height, kernel_width)
-    )
-    padding_y, padding_x = force_pair(padding)
+        super().__init__()
 
-    batch_size, n_channels, height, width = x.shape
-    out_height = (height + 2 * padding_y - kernel_height) // stride_y + 1
-    out_width = (width + 2 * padding_x - kernel_width) // stride_x + 1
+        n_in = in_channels * self.kernel_width * self.kernel_height
+        self.weight = nn.parameter.Parameter(
+            uniform_random(
+                (out_channels, in_channels, self.kernel_height, self.kernel_width),
+                1.0 / np.sqrt(n_in),
+            )
+        )
 
-    x_padded = pad2d(x, padding_x, padding_x, padding_y, padding_y, x.min())
-    batch_stride, channels_stride, height_stride, width_stride = x_padded.stride()  # type: ignore
+    def forward(self, x: t.Tensor) -> t.Tensor:
+        """Apply the functional conv2d you wrote earlier."""
+        return conv2d(x, self.weight, self.stride, self.padding)
 
-    x_view = x_padded.as_strided(
-        size=(
-            batch_size,
-            n_channels,
-            out_height,
-            out_width,
-            kernel_height,
-            kernel_width,
-        ),
-        stride=(
-            batch_stride,
-            channels_stride,
-            height_stride * stride_y,
-            width_stride * stride_x,
-            height_stride,
-            width_stride,
-        ),
-    )
-
-    return x_view.amax((-2, -1))
+    def extra_repr(self) -> str:
+        return ", ".join(
+            map(
+                lambda p: f"{p}={getattr(self, p)}",
+                ("in_channels", "out_channels", "kernel_size", "stride", "padding"),
+            )
+        )
 
 
-utils.test_maxpool2d(maxpool2d)
-
-# %%
+utils.test_conv2d_module(Conv2d)

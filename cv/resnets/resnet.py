@@ -23,8 +23,6 @@ from arena.resnets import utils
 
 
 
-
-
 class BatchNorm2d(nn.Module):
     running_mean: t.Tensor  # shape: (num_features,)
     running_var: t.Tensor  # shape: (num_features,)
