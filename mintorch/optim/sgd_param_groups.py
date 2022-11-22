@@ -7,7 +7,7 @@ import torch as t
 from matplotlib import pyplot as plt
 from torch import nn, optim
 
-from arena.w3d2 import utils
+from arena.mintorch.optim import utils
 
 # %%
 

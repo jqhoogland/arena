@@ -7,8 +7,8 @@ import torch as t
 from matplotlib import pyplot as plt
 from torch import nn, optim
 
-from arena.w3d1 import utils
-from arena.w3d1.optimizers import SGD, Adam, RMSprop, rosenbrocks_banana
+from arena.mintorch.optim import utils
+from arena.mintorch.optim.optimizers import SGD, Adam, rosenbrocks_banana
 
 # %%
 
@@ -105,7 +105,9 @@ def opt_fn_with_scheduler(
     """
     assert xy.requires_grad
     optimizer = optimizer_class([xy], **optimizer_kwargs)
-    scheduler = scheduler_class(optimizer, **scheduler_kwargs) if scheduler_class else None
+    scheduler = (
+        scheduler_class(optimizer, **scheduler_kwargs) if scheduler_class else None
+    )
 
     out = [xy.detach().clone()]
 
@@ -121,6 +123,7 @@ def opt_fn_with_scheduler(
 
     return t.stack(out)
 
+
 # %%
 
 xy = t.tensor([-1.5, 2.5], requires_grad=True)
@@ -131,11 +134,20 @@ optimizers = [
     (SGD, dict(lr=1e-3, momentum=0.98)),
 ]
 schedulers = [
-    (), # Empty list stands for no scheduler
+    (),  # Empty list stands for no scheduler
     (ExponentialLR, dict(gamma=0.99)),
 ]
 
-fig = utils.plot_optimization_with_schedulers(opt_fn_with_scheduler, rosenbrocks_banana, xy, optimizers, schedulers, x_range, y_range, show_min=True)
+fig = utils.plot_optimization_with_schedulers(
+    opt_fn_with_scheduler,
+    rosenbrocks_banana,
+    xy,
+    optimizers,
+    schedulers,
+    x_range,
+    y_range,
+    show_min=True,
+)
 
 fig.show()
 

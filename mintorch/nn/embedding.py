@@ -1,4 +1,10 @@
-class Embedding(nn.Module):
+import torch as t
+from torch import nn
+
+from arena.mintorch.nn.containers import Module
+
+
+class Embedding(Module):
     def __init__(self, num_embeddings: int, embedding_dim: int):
         self.num_embeddings = num_embeddings
         self.embedding_dim = embedding_dim
@@ -20,4 +26,4 @@ class Embedding(nn.Module):
         )
 
 
-utils.test_embedding(Embedding)
+# utils.test_embedding(Embedding)

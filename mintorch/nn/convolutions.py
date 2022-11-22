@@ -4,7 +4,9 @@ import numpy as np
 import torch as t
 from fancy_einsum import einsum
 
-from arena.convnets import utils
+from arena.mintorch.nn.padding import pad1d, pad2d
+from arena.mintorch.nn.utils import uniform_random
+from arena.mintorch.utils import IntOrPair, force_pair
 
 # %%
 
@@ -38,8 +40,7 @@ def conv1d_minimal(x: t.Tensor, weights: t.Tensor) -> t.Tensor:
     )
 
 
-utils.test_conv1d_minimal(conv1d_minimal)
-# %%
+# utils.test_conv1d_minimal(conv1d_minimal)
 
 
 def conv2d_minimal(x: t.Tensor, weights: t.Tensor) -> t.Tensor:
@@ -88,7 +89,7 @@ def conv2d_minimal(x: t.Tensor, weights: t.Tensor) -> t.Tensor:
     )
 
 
-utils.test_conv2d_minimal(conv2d_minimal)
+# utils.test_conv2d_minimal(conv2d_minimal)
 # %%
 
 
@@ -123,8 +124,7 @@ def conv1d(x, weights, stride: int = 1, padding: int = 0) -> t.Tensor:
     )
 
 
-utils.test_conv1d(conv1d)
-
+# utils.test_conv1d(conv1d)
 
 # %%
 
@@ -179,8 +179,7 @@ def conv2d(x, weights, stride: IntOrPair = 1, padding: IntOrPair = 0) -> t.Tenso
     )
 
 
-utils.test_conv2d(conv2d)
-
+# utils.test_conv2d(conv2d)
 # %%
 
 
@@ -210,7 +209,7 @@ class Conv2d(nn.Module):
         super().__init__()
 
         n_in = in_channels * self.kernel_width * self.kernel_height
-        self.weight = nn.parameter.Parameter(
+        self.weight = t.nn.parameter.Parameter(
             uniform_random(
                 (out_channels, in_channels, self.kernel_height, self.kernel_width),
                 1.0 / np.sqrt(n_in),
@@ -230,4 +229,4 @@ class Conv2d(nn.Module):
         )
 
 
-utils.test_conv2d_module(Conv2d)
+# utils.test_conv2d_module(Conv2d)

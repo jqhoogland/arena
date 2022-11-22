@@ -4,8 +4,8 @@ import torch as t
 import torch.nn as nn
 from fancy_einsum import einsum
 
-from arena.convnets import utils
-from arena.convnets.convolutions import conv2d, force_pair, maxpool2d
+from arena.mintorch.nn.containers import Module
+from arena.mintorch.nn.utils import uniform_random
 
 # %%
 
@@ -54,6 +54,6 @@ class Linear(nn.Module):
         return f"in_features={self.in_features}, out_features={self.out_features}, bias={bias}"
 
 
-utils.test_linear_forward(Linear)
-utils.test_linear_parameters(Linear)
-utils.test_linear_no_bias(Linear)
+# utils.test_linear_forward(Linear)
+# utils.test_linear_parameters(Linear)
+# utils.test_linear_no_bias(Linear)

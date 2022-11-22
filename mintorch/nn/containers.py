@@ -3,7 +3,9 @@ from typing import Any, Iterator, Union
 
 import torch as t
 
-from arena.mintorch.nn.backprop.backprop import Parameter, Tensor
+# from arena.mintorch.nn.backprop.backprop import Parameter, Tensor
+from torch import Tensor
+from torch.nn import Parameter
 
 
 class Module:

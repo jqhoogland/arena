@@ -1,8 +1,10 @@
 #%%
-
-import numpy as np
 import torch as t
-from fancy_einsum import einsum
+from torch import nn
+
+# from arena.mintorch.nn.containers import Module
+
+# %%
 
 
 def pad1d(x: t.Tensor, left: int, right: int, pad_value=0.0) -> t.Tensor:
@@ -23,8 +25,8 @@ def pad1d(x: t.Tensor, left: int, right: int, pad_value=0.0) -> t.Tensor:
     return x_padded
 
 
-utils.test_pad1d(pad1d)
-utils.test_pad1d_multi_channel(pad1d)
+# utils.test_pad1d(pad1d)
+# utils.test_pad1d_multi_channel(pad1d)
 
 
 def pad2d(
@@ -50,7 +52,6 @@ def pad2d(
     return x_padded
 
 
-utils.test_pad2d(pad2d)
-utils.test_pad2d_multi_channel(pad2d)
+# utils.test_pad2d(pad2d)
+# utils.test_pad2d_multi_channel(pad2d)
 # %%
-

@@ -3,6 +3,7 @@ import torch as t
 import torch.nn as nn
 from fancy_einsum import einsum
 
+from arena.mintorch.nn.padding import pad2d
 from arena.mintorch.utils import IntOrPair, force_pair
 
 # %%
@@ -86,6 +87,6 @@ class MaxPool2d(nn.Module):
         )
 
 
-utils.test_maxpool2d_module(MaxPool2d)
-m = MaxPool2d(kernel_size=3, stride=2, padding=1)
-print(f"Manually verify that this is an informative repr: {m}")
+# utils.test_maxpool2d_module(MaxPool2d)
+# m = MaxPool2d(kernel_size=3, stride=2, padding=1)
+# print(f"Manually verify that this is an informative repr: {m}")

@@ -1,3 +1,9 @@
+import torch as t
+from torch import nn
+
+# from arena.mintorch.nn.containers import Module
+
+
 class LayerNorm(nn.Module):
     def __init__(
         self,
@@ -30,8 +36,8 @@ class LayerNorm(nn.Module):
         return x_norm
 
 
-utils.test_layernorm_mean_1d(LayerNorm)
-utils.test_layernorm_mean_2d(LayerNorm)
-utils.test_layernorm_std(LayerNorm)
-utils.test_layernorm_exact(LayerNorm)
-utils.test_layernorm_backward(LayerNorm)
+# utils.test_layernorm_mean_1d(LayerNorm)
+# utils.test_layernorm_mean_2d(LayerNorm)
+# utils.test_layernorm_std(LayerNorm)
+# utils.test_layernorm_exact(LayerNorm)
+# utils.test_layernorm_backward(LayerNorm)

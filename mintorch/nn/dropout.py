@@ -1,4 +1,9 @@
-class Dropout(nn.Module):
+import torch as t
+from torch import nn
+
+from arena.mintorch.nn.containers import Module
+
+class Dropout(Module):
     def __init__(self, p: float):
         self.p = p
 
@@ -12,7 +17,7 @@ class Dropout(nn.Module):
         return x
 
 
-utils.test_dropout_eval(Dropout)
-utils.test_dropout_training(Dropout)
+# utils.test_dropout_eval(Dropout)
+# utils.test_dropout_training(Dropout)
 
 # %%

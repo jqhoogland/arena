@@ -7,7 +7,7 @@ import torch as t
 from matplotlib import pyplot as plt
 from torch import nn, optim
 
-from arena.w3d1 import utils
+from arena.mintorch.optim import utils
 
 # %%
 
@@ -275,6 +275,7 @@ def opt_fn(
 
     return t.stack(out)
 
+
 xy = t.tensor([-1.5, 3], requires_grad=True)
 x_range = [-2, 2]
 y_range = [-1, 3]
@@ -284,9 +285,10 @@ optimizers = [
     (Adam, dict(lr=1e-3, weight_decay=0.1)),
 ]
 
-fig = utils.plot_optimization(opt_fn, rosenbrocks_banana, xy, optimizers, x_range, y_range)
+fig = utils.plot_optimization(
+    opt_fn, rosenbrocks_banana, xy, optimizers, x_range, y_range
+)
 
 fig.show()
 fig
 # %%
-

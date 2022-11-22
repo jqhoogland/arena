@@ -1,3 +1,9 @@
+import torch as t
+from torch import nn
+
+from arena.mintorch.nn.containers import Module
+
+
 class Flatten(nn.Module):
     def __init__(self, start_dim: int = 1, end_dim: int = -1) -> None:
         self.start_dim = start_dim
@@ -14,7 +20,7 @@ class Flatten(nn.Module):
         return f"start_dim={self.start_dim}, end_dim={self.end_dim}"
 
 
-utils.test_flatten(Flatten)
+# utils.test_flatten(Flatten)
 # %%
 
 
