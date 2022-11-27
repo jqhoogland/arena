@@ -1,5 +1,6 @@
 import numpy as np
 import torch as t
+from torch import nn
 
 from arena.mintorch.nn.containers import Module
 
@@ -25,3 +26,12 @@ class GELU(Module):
 
 
 # utils.plot_gelu(GELU)
+
+
+def swish(x: t.Tensor, beta: float = 1.0) -> t.Tensor:
+    return x * t.sigmoid(beta * x)
+
+
+class SiLU(nn.Module):
+    def forward(self, x: t.Tensor) -> t.Tensor:
+        return swish(x)

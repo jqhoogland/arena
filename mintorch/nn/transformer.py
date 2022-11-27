@@ -5,7 +5,7 @@ from torch import nn
 
 from arena.mintorch.nn.attention import MultiheadMaskedAttention
 from arena.mintorch.nn.containers import Module
-from arena.mintorch.nn.encoding import SinusoidalPositionalEncoding
+from arena.mintorch.nn.encoding import TokenSinusoidalPositionalEncoding
 from arena.mintorch.nn.padding import pad1d, pad2d
 
 
@@ -82,7 +82,7 @@ class DecoderOnlyTransformer(nn.Module):
         super().__init__()
 
         self.embedding = nn.Embedding(config.vocab_size, config.hidden_size)
-        self.positional_embedding = SinusoidalPositionalEncoding(
+        self.positional_embedding = TokenSinusoidalPositionalEncoding(
             config.hidden_size, config.max_seq_len
         )
 

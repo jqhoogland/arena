@@ -488,7 +488,6 @@ def sample(
     return xs if return_all_steps else x
 
 
-
 if __name__ == "__main__":
     print("Generating multiple images")
     assert isinstance(model, DiffusionModel)

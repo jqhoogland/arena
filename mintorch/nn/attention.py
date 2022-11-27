@@ -8,16 +8,16 @@ from fancy_einsum import einsum
 from torch import nn
 from torchtyping import TensorType
 
-from arena.mintorch.nn.encoding import SinusoidalPositionalEncoding
+from arena.mintorch.nn.encoding import TokenSinusoidalPositionalEncoding
 
 # %%
 
 
 def attention(
-    Q: TensorType["batch", "seq_len", "d_head"],
-    K: TensorType["batch", "seq_len", "d_head"],
-    V: TensorType["batch", "seq_len", "d_head"],
-) -> TensorType["batch", "seq_len", "d_head"]:
+    Q: TensorType["b", "s", "h"],
+    K: TensorType["b", "s", "h"],
+    V: TensorType["b", "s", "h"],
+) -> TensorType["b", "s", "h"]:
     """
     Should return the results of self-attention.
 
@@ -29,7 +29,7 @@ def attention(
     """
     _, _, d_head = Q.shape
 
-    A: TensorType["seq_len", "seq_len"] = t.softmax(
+    A: TensorType["s", "s"] = t.softmax(
         (einsum("b s h, b t h-> b s t", Q, K) / np.sqrt(d_head)), dim=1
     )
 
@@ -61,9 +61,7 @@ test_attention()
 # %%
 
 
-def mask(
-    A: TensorType[..., "seq_len", "seq_len"]
-) -> TensorType[..., "seq_len", "seq_len"]:
+def mask(A: TensorType[..., "s", "s"]) -> TensorType[..., "s", "s"]:
     seq_len = A.shape[-1]
 
     mask = t.triu(t.ones(seq_len, seq_len), diagonal=1).bool()
@@ -90,10 +88,10 @@ test_mask()
 
 #%%
 def masked_attention(
-    Q: TensorType["batch", "seq_len", "d_head"],
-    K: TensorType["batch", "seq_len", "d_head"],
-    V: TensorType["batch", "seq_len", "d_head"],
-) -> TensorType["batch", "seq_len", "d_head"]:
+    Q: TensorType["b", "s", "h"],
+    K: TensorType["b", "s", "h"],
+    V: TensorType["b", "s", "h"],
+) -> TensorType["b", "s", "h"]:
     """
     Should return the results of self-attention.
 
@@ -105,11 +103,11 @@ def masked_attention(
     """
     _, _, d_head = Q.shape
 
-    A_pre: TensorType["batch", "seq_len", "seq_len"] = mask(
+    A_pre: TensorType["b", "s", "s"] = mask(
         einsum("b s h, b t h-> b s t", Q, K)
     ) / np.sqrt(d_head)
 
-    A: TensorType["batch", "seq_len", "seq_len"] = t.softmax(A_pre, dim=-2)
+    A: TensorType["b", "s", "s"] = t.softmax(A_pre, dim=-2)
 
     return A @ V
 
@@ -119,11 +117,11 @@ def masked_attention(
 
 
 def multihead_masked_attention(
-    Q: TensorType["batch", "seq", "n_heads*headsize"],
-    K: TensorType["batch", "seq", "n_heads*headsize"],
-    V: TensorType["batch", "seq", "n_heads*headsize"],
+    Q: TensorType["b", "s", "n_heads*headsize"],
+    K: TensorType["b", "s", "n_heads*headsize"],
+    V: TensorType["b", "s", "n_heads*headsize"],
     num_heads: int,
-) -> TensorType["batch", "seq", "n_heads*headsize"]:
+) -> TensorType["b", "s", "n_heads*headsize"]:
     """
     Should return the results of multihead self-attention.
 
@@ -206,14 +204,7 @@ class MultiheadMaskedAttention(nn.Module):
         self.W_QKV = nn.Linear(hidden_size, hidden_size * 3)
         self.W_O = nn.Linear(hidden_size, hidden_size)
 
-    def forward(
-        self, x: TensorType["batch", "seq", "hidden_size"]
-    ) -> TensorType["batch", "seq", "hidden_size"]:
-        """
-        x: shape (batch, seq, hidden_size)
-
-        Return: shape (batch, seq, hidden_size)
-        """
+    def forward(self, x: TensorType["b", "s", "h"]) -> TensorType["b", "s", "h"]:
         Q, K, V = self.W_QKV(x).chunk(3, dim=-1)
         return self.W_O(multihead_masked_attention(Q, K, V, self.num_heads))
 
@@ -250,3 +241,42 @@ def test_multihead_masked_attention_2():
 test_multihead_masked_attention_2()
 
 # %%
+
+
+class SelfAttention2d(nn.Module):
+    W_QKV: nn.Linear
+    W_O: nn.Linear
+
+    def __init__(self, channels: int, num_heads: int = 4):
+        """
+        Self-Attention with two spatial dimensions.
+
+        channels: the number of channels. Should be divisible by the number of heads.
+        """
+        assert channels % num_heads == 0
+
+        self.channels = channels
+        self.num_heads = num_heads
+        self.head_size = channels // num_heads
+
+        super().__init__()
+
+        self.W_QKV = nn.Linear(channels, channels * 3)
+        self.W_O = nn.Linear(channels, channels)
+
+    def forward(
+        self, x: TensorType["b", "c", "h", "w"]
+    ) -> TensorType["b", "c", "h", "w"]:
+        """
+        x: shape (batch, channels, height, width)
+        out: shape (batch, channels, height, width)
+        """
+        b, c, h, w = x.shape
+        assert c == self.channels
+
+        x_flat = einops.rearrange(x, "b c h w -> b (h w) c")
+
+        Q, K, V = self.W_QKV(x_flat).chunk(3, dim=-1)
+        attn = self.W_O(attention(Q, K, V))
+
+        return einops.rearrange(attn, "b (h w) c -> b c h w", h=h, w=w)

@@ -1,3 +1,4 @@
+import einops
 import torch as t
 from torch import nn
 
@@ -41,3 +42,37 @@ class LayerNorm(nn.Module):
 # utils.test_layernorm_std(LayerNorm)
 # utils.test_layernorm_exact(LayerNorm)
 # utils.test_layernorm_backward(LayerNorm)
+
+
+class GroupNorm2d(nn.Module):
+    def __init__(
+        self,
+        num_groups: int,
+        num_channels: int,
+        eps: float = 1e-05,
+        affine=True,
+    ) -> None:
+        self.num_groups = num_groups
+        self.num_channels = num_channels
+        self.eps = eps
+        self.affine = affine
+
+        super().__init__()
+
+        if self.affine:
+            self.weight = nn.Parameter(t.ones(num_channels))
+            self.bias = nn.Parameter(t.zeros(num_channels))
+
+    def forward(self, x: t.Tensor) -> t.Tensor:
+        x = einops.rearrange(x, "b (g c) h w -> b g c h w", g=self.num_groups)
+
+        mean = x.mean(dim=(2, 3, 4), keepdim=True)
+        var = x.var(dim=(2, 3, 4), unbiased=False, keepdim=True)
+
+        x = (x - mean) / t.sqrt(var + self.eps)
+        x = einops.rearrange(x, "b g c h w -> b (g c) h w", g=self.num_groups)
+
+        if self.affine:
+            return x * self.weight + self.bias
+
+        return x
