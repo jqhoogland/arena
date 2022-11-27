@@ -280,3 +280,6 @@ class SelfAttention2d(nn.Module):
         attn = self.W_O(attention(Q, K, V))
 
         return einops.rearrange(attn, "b (h w) c -> b c h w", h=h, w=w)
+
+
+# %%

@@ -5,6 +5,7 @@ DDPM Model-based U-net
 https://arxiv.org/abs/2006.11239.pdf
 """
 
+import einops
 import matplotlib.pyplot as plt
 import torch as t
 from einops import rearrange, repeat
@@ -23,14 +24,14 @@ from arena.mintorch.nn.normalization import GroupNorm2d
 
 
 class AttentionBlock(nn.Module):
-    def __init__(self, channels: int, num_heads: int = 4, groups: int = 4):
+    def __init__(self, channels: int, num_heads: int = 4, groups: int = 1):
         self.channels = channels
         self.num_heads = num_heads
         self.groups = groups
 
         super().__init__()
 
-        self.group_norm = GroupNorm2d(1, channels, groups=groups)
+        self.group_norm = GroupNorm2d(groups, channels)
         self.self_attn = SelfAttention2d(channels, num_heads)
 
     def forward(self, x: t.Tensor) -> t.Tensor:
@@ -45,7 +46,7 @@ class ResidualBlock(nn.Module):
         t_emb_dim: int = 2,
         kernel_size: int = 3,
         padding: int = 1,
-        groups: int = 8,
+        groups: int = 4,
         include_conv1x1: bool = False,
     ) -> None:
         self.c_in = c_in
@@ -53,7 +54,7 @@ class ResidualBlock(nn.Module):
         self.t_emb_dim = t_emb_dim
         self.kernel_size = kernel_size
         self.padding = padding
-        self.groups = groups
+        self.groups = groups = min(groups, c_out)  # TODO: What is going on here?
         self.include_conv1x1 = include_conv1x1
 
         super().__init__()
@@ -79,8 +80,11 @@ class ResidualBlock(nn.Module):
         x: TensorType["b", "c_in", "h", "w"],
         num_steps: TensorType["b", "emb"],
     ) -> TensorType["b", "c_out", "h", "w"]:
-        y = self.conv_block_1(x) + self.num_steps_block(num_steps)
-        y = self.conv_block_2(y)
+        time_embed = einops.rearrange(
+            self.num_steps_block(num_steps), "b c_out -> b c_out 1 1"
+        )
+        y = self.conv_block_1(x)
+        y = self.conv_block_2(y + time_embed)
 
         if self.include_conv1x1:
             y += self.conv1x1(x)
@@ -98,7 +102,7 @@ class DownBlock(nn.Module):
         kernel_size: int = 4,
         stride: int = 2,
         padding: int = 1,
-        groups: int = 8,
+        groups: int = 4,
     ) -> None:
         self.c_in = c_in
         self.c_out = c_out = c_out or c_in // 2
@@ -113,7 +117,7 @@ class DownBlock(nn.Module):
         self.embed_num_steps = nn.Embedding(2, t_emb_dim)
         self.resid_block_1 = ResidualBlock(c_in, c_out, t_emb_dim, groups=groups)
         self.resid_block_2 = ResidualBlock(c_out, c_out, t_emb_dim, groups=groups)
-        self.attn_block = AttentionBlock(c_in, groups=groups)
+        self.attn_block = AttentionBlock(c_in)
 
         if downsample:
             self.conv = nn.Conv2d(
@@ -146,7 +150,7 @@ class MidBlock(nn.Module):
         self,
         c: int,
         t_emb_dim: int = 2,
-        groups: int = 8,
+        groups: int = 4,
     ) -> None:
         self.c = c
         self.t_emb_dim = t_emb_dim
@@ -155,7 +159,7 @@ class MidBlock(nn.Module):
         super().__init__()
 
         self.resid_block_1 = ResidualBlock(c, t_emb_dim, groups=groups)
-        self.attn_block = AttentionBlock(c, groups=groups)
+        self.attn_block = AttentionBlock(c)
         self.resid_block_2 = ResidualBlock(c, t_emb_dim, groups=groups)
 
     def forward(
@@ -179,7 +183,7 @@ class UpBlock(nn.Module):
         kernel_size: int = 4,
         stride: int = 2,
         padding: int = 1,
-        groups: int = 8,
+        groups: int = 4,
     ) -> None:
         self.c_in = c_in
         self.c_out = c_out = c_out or c_in * 2
@@ -195,7 +199,7 @@ class UpBlock(nn.Module):
 
         self.resid_block_1 = ResidualBlock(c_in, t_emb_dim, groups=groups)
         self.resid_block_2 = ResidualBlock(c_in, t_emb_dim, groups=groups)
-        self.attn_block = AttentionBlock(c_in, groups=groups)
+        self.attn_block = AttentionBlock(c_in)
 
         if upsample:
             self.conv = nn.ConvTranspose2d(
@@ -229,7 +233,7 @@ class NumNoiseStepsEncoding(nn.Module):
         self.max_steps = max_steps
         super().__init__()
 
-        self.embedding = IntSinusoidalPositionalEncoding(1000, max_steps)
+        self.embedding = IntSinusoidalPositionalEncoding(max_steps, max_steps)
         self.linear_1 = nn.Linear(max_steps, t_emb_dim)
         self.gelu = nn.GELU()
         self.linear_2 = nn.Linear(t_emb_dim, t_emb_dim)
@@ -267,10 +271,13 @@ class DDPM(DiffusionModel):
         t_emb_dim = 4 * channels
         self.embed_num_steps = NumNoiseStepsEncoding(t_emb_dim, max_steps)
 
-        self.conv_1 = nn.Conv2d(3, channels, kernel_size=7, stride=1, padding=3)
+        self.conv_1 = nn.Conv2d(
+            image_shape[0], channels, kernel_size=7, stride=1, padding=3
+        )
 
-        in_channels_down = (channels,) + tuple(channels * d for d in dim_mults[:-1])
-        out_channels_down = tuple(channels * d for d in dim_mults)
+        channels_list = tuple(channels * d for d in dim_mults)
+        in_channels_down = (channels,) + channels_list[:-1]
+        out_channels_down = channels_list
 
         self.down_blocks = nn.ModuleList(
             [
@@ -292,6 +299,9 @@ class DDPM(DiffusionModel):
             t_emb_dim=t_emb_dim,
         )
 
+        in_channels_up = channels_list[-1:0:-1]
+        out_channels_up = channels_list[-2::-1]
+
         self.up_blocks = nn.ModuleList(
             [
                 UpBlock(
@@ -300,7 +310,7 @@ class DDPM(DiffusionModel):
                     groups=groups,
                 )
                 for i, (in_channels, out_channels) in enumerate(
-                    zip(reversed(out_channels_down), reversed(in_channels_down))
+                    zip(in_channels_up, out_channels_up)
                 )
             ]
         )
@@ -309,7 +319,9 @@ class DDPM(DiffusionModel):
         self.up_block_2 = UpBlock(channels * 2, channels, t_emb_dim=t_emb_dim)
 
         self.resid_block = ResidualBlock(channels, channels, t_emb_dim=t_emb_dim)
-        self.conv_2 = nn.Conv2d(channels, 3, kernel_size=1, stride=1, padding=0)
+        self.conv_2 = nn.Conv2d(
+            channels, self.image_shape[0], kernel_size=1, stride=1, padding=0
+        )
 
     def forward(
         self,

@@ -51,17 +51,23 @@ class GroupNorm2d(nn.Module):
         num_channels: int,
         eps: float = 1e-05,
         affine=True,
+        device: t.device | str | None = None,
+        dtype: t.dtype | None = None,
     ) -> None:
+        assert num_channels % num_groups == 0
+
         self.num_groups = num_groups
         self.num_channels = num_channels
         self.eps = eps
         self.affine = affine
+        self.device = device
+        self.dtype = dtype
 
         super().__init__()
 
         if self.affine:
-            self.weight = nn.Parameter(t.ones(num_channels))
-            self.bias = nn.Parameter(t.zeros(num_channels))
+            self.weight = nn.Parameter(t.ones(num_channels, device=device, dtype=dtype))
+            self.bias = nn.Parameter(t.zeros(num_channels, device=device, dtype=dtype))
 
     def forward(self, x: t.Tensor) -> t.Tensor:
         x = einops.rearrange(x, "b (g c) h w -> b g c h w", g=self.num_groups)
@@ -70,9 +76,11 @@ class GroupNorm2d(nn.Module):
         var = x.var(dim=(2, 3, 4), unbiased=False, keepdim=True)
 
         x = (x - mean) / t.sqrt(var + self.eps)
-        x = einops.rearrange(x, "b g c h w -> b (g c) h w", g=self.num_groups)
+        x = einops.rearrange(x, "b g c h w -> b (g c) h w")
 
         if self.affine:
-            return x * self.weight + self.bias
+            return x * self.weight.unsqueeze(-1).unsqueeze(-1) + self.bias.unsqueeze(
+                -1
+            ).unsqueeze(-1)
 
         return x
