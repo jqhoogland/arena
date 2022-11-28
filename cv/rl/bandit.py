@@ -276,3 +276,48 @@ if MAIN:
     plot_rewards(all_rewards, names, moving_avg_window=15)
 
 # %%
+
+class UCBActionSelection(Agent):
+    def __init__(self, num_arms: int, seed: int, c: float):
+        super().__init__(num_arms, seed)
+        self.c = c
+
+        self.t = 0
+        self.n = np.zeros(self.num_arms)
+        self.q = np.zeros(self.num_arms)
+
+        self.epsilon = 1e-8 # For numerical stability
+
+    def get_action(self):
+        return np.argmax(self.q + self.c * np.sqrt(np.log(self.t) / (self.n + self.epsilon)))
+
+    def observe(self, action, reward, info):
+        self.t += 1
+        self.n[action] += 1
+        self.q[action] += (reward - self.q[action]) / (self.n[action] + self.epsilon)
+
+    def reset(self, seed: int):
+        super().reset(seed)
+
+        self.t = 0
+        self.n = np.zeros(self.num_arms)
+        self.q = np.zeros(self.num_arms)
+
+
+if MAIN:
+    cheater = CheatyMcCheater(num_arms, 0)
+    reward_averaging = RewardAveraging(num_arms, 0, epsilon=0.1, optimism=0)
+    reward_averaging_optimism = RewardAveraging(num_arms, 0, epsilon=0.1, optimism=5)
+    ucb = UCBActionSelection(num_arms, 0, c=2.0)
+    random = RandomAgent(num_arms, 0)
+
+    names = []
+    all_rewards = []
+
+    for agent in [cheater, reward_averaging, reward_averaging_optimism, ucb, random]:
+        (rewards, num_correct) = test_agent(env, agent, n_runs=N_RUNS)
+        names.append(str(agent))
+        all_rewards.append(rewards)
+
+    plot_rewards(all_rewards, names, moving_avg_window=15)
+# %%
