@@ -380,3 +380,7 @@ if MAIN:
     plot_rewards(all_rewards, names, moving_avg_window=15)
 
 # %%
+
+
+# TODO: Try out the non-stationary case (random walk over arm averages)
+# TODO: Plot average reward for a range of parameter values for each agent (also for the non-stationary case                                                                                       )
